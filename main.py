@@ -281,7 +281,7 @@ async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Collect members who still have attacks left
         pending = []
         for member in war.clan.members:
-            used = member.attacks_used
+            used = len(member.attacks) if member.attacks else 0
             remaining = attacks_per_member - used
             if remaining > 0:
                 pending.append((member, used, remaining))
