@@ -31,6 +31,34 @@ ROLE_BLOCKS = {
     "member":   ("🔹", "УЧАСТНИКИ"),
 }
 
+# Custom emoji IDs for town hall levels from @newsclashua sticker pack
+# 🏠 stickers (indices 150-161) → TH1-TH12, 🏰 stickers (162-163) → TH13-TH14
+TH_EMOJI_IDS = {
+    1:  "5208550794554529355",
+    2:  "5206224876490215689",
+    3:  "5206559982723552037",
+    4:  "5206299492957050021",
+    5:  "5206555722115994234",
+    6:  "5204197845200032691",
+    7:  "5204157528342024190",
+    8:  "5208864009339555881",
+    9:  "5208638119829590124",
+    10: "5206574048741446354",
+    11: "5208840610357726320",
+    12: "5208817658052495737",
+    13: "5334915582875686693",
+    14: "5334591372974382823",
+}
+
+
+def th_sticker(level: int) -> str:
+    emoji_id = TH_EMOJI_IDS.get(level)
+    if emoji_id:
+        base = "🏰" if level >= 13 else "🏠"
+        return f'<tg-emoji emoji-id="{emoji_id}">{base}</tg-emoji>'
+    return f"🏠{level}"
+
+
 coc_client = coc.Client()
 
 
@@ -118,10 +146,10 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             key=lambda m: (ROLE_ORDER.get(m.role.value, 9), m.name.lower())
         )
 
-        # Group members by role
+        # Group members by role (store full member objects)
         groups: dict[str, list] = defaultdict(list)
         for member in members_sorted:
-            groups[member.role.value].append(member.name)
+            groups[member.role.value].append(member)
 
         lines = [
             f"🏰 <b>{clan.name}</b>",
@@ -133,10 +161,9 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if role_key not in groups:
                 continue
             emoji, title = ROLE_BLOCKS.get(role_key, ("🔹", "УЧАСТНИКИ"))
-            members_in_role = groups[role_key]
             lines.append(f"\n{emoji} <b>{title}</b>")
-            for name in members_in_role:
-                lines.append(f"• {name}")
+            for m in groups[role_key]:
+                lines.append(f"• {th_sticker(m.town_hall)} {m.name}")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
