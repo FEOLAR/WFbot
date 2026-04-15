@@ -1,6 +1,5 @@
 import os
 import logging
-import asyncio
 from datetime import datetime
 import coc
 from telegram import Update
@@ -24,11 +23,11 @@ ROLE_ORDER = {
     "admin": 2,
     "member": 3,
 }
-ROLE_NAMES = {
-    "leader": "👑 Лидер",
-    "coLeader": "⭐ Со-лидер",
-    "admin": "🔰 Старейшина",
-    "member": "👤 Участник",
+ROLE_BLOCKS = {
+    "leader":   ("🟡", "ЛИДЕР"),
+    "coLeader": ("🟣", "СОРУКОВОДИТЕЛИ"),
+    "admin":    ("🟢", "СТАРЕЙШИНЫ"),
+    "member":   ("🔵", "УЧАСТНИКИ"),
 }
 
 coc_client = coc.Client()
@@ -109,54 +108,30 @@ async def online_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-async def fetch_player_safe(tag: str) -> coc.Player | None:
-    try:
-        return await coc_client.get_player(tag)
-    except Exception:
-        return None
-
-
 async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("⏳ Загружаю данные клана...")
+    msg = await update.message.reply_text("⏳ Загружаю список клана...")
     try:
         clan = await coc_client.get_clan(CLAN_TAG)
         members_sorted = sorted(
             clan.members,
-            key=lambda m: (ROLE_ORDER.get(m.role.value, 9), -m.donations)
+            key=lambda m: (ROLE_ORDER.get(m.role.value, 9), m.name.lower())
         )
 
-        await msg.edit_text(f"⏳ Загружаю данные игроков (0/{clan.member_count})...")
-
-        # Fetch all players in parallel
-        players = await asyncio.gather(*[fetch_player_safe(m.tag) for m in members_sorted])
-        player_map = {p.tag: p for p in players if p is not None}
-
         lines = [
-            f"🏰 <b>{clan.name}</b> ({clan.tag})",
-            f"👥 Участников: {clan.member_count}/50\n",
-            f"{'Игрок':<20} {'🏹':>5} {'🏛️':>8} {'⭐':>6}",
-            "─" * 42,
+            f"🏰 <b>{clan.name}</b>",
+            f"👥 {clan.member_count}/50 участников",
         ]
 
         current_role = None
         for i, member in enumerate(members_sorted, 1):
             role_key = member.role.value
-            role_label = ROLE_NAMES.get(role_key, "👤 Участник")
             if role_key != current_role:
                 current_role = role_key
-                lines.append(f"\n<b>{role_label}</b>")
+                emoji, title = ROLE_BLOCKS.get(role_key, ("🔵", "УЧАСТНИКИ"))
+                lines.append(f"\n{emoji}{emoji}{emoji} <b>{title}</b> {emoji}{emoji}{emoji}")
 
-            player = player_map.get(member.tag)
-            donations = member.donations
-            capital = player.clan_capital_contributions if player else 0
-            war_stars = player.war_stars if player else 0
+            lines.append(f"  • {member.name}")
 
-            lines.append(
-                f"  {i}. {member.name}\n"
-                f"       🏹 {donations}  🏛️ {capital:,}  ⭐ {war_stars}"
-            )
-
-        lines.append(f"\n<i>🏹 пожертвования · 🏛️ вклад в столицу · ⭐ звёзды войны</i>")
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
     except coc.NotFound:
