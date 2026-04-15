@@ -290,19 +290,52 @@ async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pending.sort(key=lambda x: x[1])
 
         state_label = "⚔️ Война идёт" if war.state == "inWar" else "🏁 Война завершена"
+
+        # Clan stars
+        our_stars = war.clan.stars
+        their_stars = war.opponent.stars
+        stars_line = f"⭐ {our_stars}  vs  {their_stars} ⭐"
+
+        # Time remaining
+        time_str = ""
+        if war.state == "inWar" and war.end_time:
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            diff = war.end_time.time - now
+            total_sec = max(int(diff.total_seconds()), 0)
+            h, m = divmod(total_sec // 60, 60)
+            time_str = f"\n⏱ До конца войны: <b>{h}ч {m}мин</b>"
+
         lines = [
-            f"{state_label}  ·  {war.clan.name} vs {war.opponent.name}",
-            f"👥 {war.team_size}v{war.team_size}",
-            "─────────────────────",
+            f"<b>{state_label}</b>",
+            f"🏰 <b>{war.clan.name}</b>  ⚔️  <b>{war.opponent.name}</b>",
+            f"👥 {war.team_size} vs {war.team_size}   {stars_line}" + time_str,
+            "",
+            "━━━━━━━━━━━━━━━━━━━━",
         ]
 
         if not pending:
-            lines.append("\n✅ Все игроки использовали свои атаки!")
+            lines.append("✅ <b>Все игроки использовали свои атаки!</b>")
         else:
-            lines.append(f"\n⏳ <b>Не атаковали ({len(pending)} чел.):</b>\n")
-            for member, used, remaining in pending:
-                stars = "🗡" * remaining
-                lines.append(f"  {stars} {member.name}  — осталось {remaining} атак(и)")
+            # Split into groups: 0 attacks used and 1 attack used
+            zero_used = [(m, r) for m, u, r in pending if u == 0]
+            one_used  = [(m, r) for m, u, r in pending if u == 1]
+
+            lines.append(f"⏳ <b>Не атаковали — {len(pending)} чел.</b>")
+
+            if zero_used:
+                lines.append("")
+                lines.append(f"🔴 <b>Нет атак ({len(zero_used)}):</b>")
+                for member, _ in zero_used:
+                    lines.append(f"  • {member.name}")
+
+            if one_used:
+                lines.append("")
+                lines.append(f"🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
+                for member, _ in one_used:
+                    lines.append(f"  • {member.name}")
+
+            lines.append("━━━━━━━━━━━━━━━━━━━━")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
