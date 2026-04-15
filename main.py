@@ -299,8 +299,7 @@ async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Time remaining
         time_str = ""
         if war.state == "inWar" and war.end_time:
-            from datetime import timezone
-            now = datetime.now(timezone.utc)
+            now = datetime.utcnow()
             diff = war.end_time.time - now
             total_sec = max(int(diff.total_seconds()), 0)
             h, m = divmod(total_sec // 60, 60)
