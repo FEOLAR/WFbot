@@ -15,7 +15,12 @@ COC_EMAIL = os.environ["COC_EMAIL"]
 COC_PASSWORD = os.environ["COC_PASSWORD"]
 CLAN_TAG = "#2R02GGRUJ"
 
-ROLE_ORDER = {"leader": 0, "coLeader": 1, "admin": 2, "member": 3}
+ROLE_ORDER = {
+    "leader": 0,
+    "coLeader": 1,
+    "admin": 2,
+    "member": 3,
+}
 ROLE_NAMES = {
     "leader": "👑 Лидер",
     "coLeader": "⭐ Со-лидер",
@@ -48,13 +53,13 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⏳ Загружаю список игроков...")
     try:
         clan = await coc_client.get_clan(CLAN_TAG)
-        members = sorted(clan.members, key=lambda m: (ROLE_ORDER.get(m.role.in_game_api_key, 9), -m.trophies))
+        members = sorted(clan.members, key=lambda m: (ROLE_ORDER.get(m.role.value, 9), -m.trophies))
 
         lines = [f"🏰 <b>{clan.name}</b> ({clan.tag})", f"👥 Участников: {clan.member_count}/50\n"]
 
         current_role = None
         for i, member in enumerate(members, 1):
-            role_key = member.role.in_game_api_key
+            role_key = member.role.value
             role_label = ROLE_NAMES.get(role_key, "👤 Участник")
             if role_key != current_role:
                 current_role = role_key
