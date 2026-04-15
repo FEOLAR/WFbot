@@ -154,6 +154,76 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("❌ Не удалось загрузить данные. Попробуй позже.")
 
 
+async def _is_admin(update: Update) -> bool:
+    """True if the sender is a group admin/creator, or if used in a private chat."""
+    chat = update.effective_chat
+    if chat.type == "private":
+        return True
+    member = await chat.get_member(update.effective_user.id)
+    return member.status in ("administrator", "creator")
+
+
+async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Usage: /link @tg_username Ник в CoC"""
+    if not await _is_admin(update):
+        await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "Использование: /link @telegram НикВCoC\n"
+            "Примеры:\n"
+            "  /link @feolar Fanon\n"
+            "  /link @feolar fil\n\n"
+            "Один @telegram можно привязать к нескольким никам."
+        )
+        return
+
+    tg_username = context.args[0].lstrip("@")
+    coc_name = " ".join(context.args[1:])
+
+    storage.link_player(coc_name, tg_username)
+    await update.message.reply_text(
+        f"✅ <b>{coc_name}</b> привязан к @{tg_username}",
+        parse_mode="HTML"
+    )
+
+
+async def unlink_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Usage: /unlink Ник в CoC"""
+    if not await _is_admin(update):
+        await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /unlink НикВCoC\nПример: /unlink Fanon")
+        return
+
+    coc_name = " ".join(context.args)
+    removed = storage.unlink_player(coc_name)
+    if removed:
+        await update.message.reply_text(f"✅ Привязка для <b>{coc_name}</b> удалена.", parse_mode="HTML")
+    else:
+        await update.message.reply_text(f"⚠️ Привязка для <b>{coc_name}</b> не найдена.", parse_mode="HTML")
+
+
+async def links_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show all current links (admin only)."""
+    if not await _is_admin(update):
+        await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
+        return
+
+    all_links = storage.get_all_links()
+    if not all_links:
+        await update.message.reply_text("Привязок пока нет. Используй /link @telegram НикВCoC")
+        return
+
+    lines = ["📋 <b>Текущие привязки:</b>", ""]
+    for coc_name, tg_user in sorted(all_links.items(), key=lambda x: x[1]):
+        lines.append(f"  {coc_name} → @{tg_user}")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(update.message.text)
 
@@ -181,6 +251,9 @@ def main():
     app.add_handler(CommandHandler("team", team_command))
     app.add_handler(CommandHandler("register", register_command))
     app.add_handler(CommandHandler("online", online_command))
+    app.add_handler(CommandHandler("link", link_command))
+    app.add_handler(CommandHandler("unlink", unlink_command))
+    app.add_handler(CommandHandler("links", links_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logger.info("Бот запущен...")
