@@ -1,6 +1,6 @@
 import os
 import asyncio
-from telegram import Bot
+from telegram import Bot, InputProfilePhotoStatic
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 
@@ -8,7 +8,8 @@ TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 async def set_photo(filename: str):
     bot = Bot(token=TOKEN)
     with open(filename, "rb") as f:
-        await bot.set_my_photo(photo=f)
+        photo = InputProfilePhotoStatic(photo=f)
+        await bot.set_my_profile_photo(photo=photo)
     print(f"Аватарка успешно установлена из файла: {filename}")
 
 
