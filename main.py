@@ -6,7 +6,6 @@ import coc
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
-import image_builder
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -153,10 +152,21 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for member in members_sorted:
             groups[member.role.value].append(member)
 
-        # Build and send image
-        image_buf = image_builder.build_team_image(clan.name, clan.member_count, groups)
-        await msg.delete()
-        await update.message.reply_photo(photo=image_buf, caption=f"🏰 {clan.name} · {clan.member_count}/50")
+        lines = [
+            f"🏰 <b>{clan.name}</b>",
+            f"👥 {clan.member_count}/50 участников",
+            "",
+        ]
+
+        for role_key in ["leader", "coLeader", "admin", "member"]:
+            if role_key not in groups:
+                continue
+            emoji, title = ROLE_BLOCKS.get(role_key, ("🔹", "УЧАСТНИКИ"))
+            lines.append(f"\n{emoji} <b>{title}</b>")
+            for m in groups[role_key]:
+                lines.append(f"• {th_sticker(m.town_hall)} {m.name}")
+
+        await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
     except coc.NotFound:
         await msg.edit_text("❌ Клан не найден. Проверь тег клана.")
@@ -172,11 +182,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def post_init(application):
     await coc_client.login(COC_EMAIL, COC_PASSWORD)
     logger.info("CoC клиент авторизован")
-    try:
-        await image_builder.preload_th_images(application.bot)
-        logger.info("Стикеры ратуш загружены")
-    except Exception as e:
-        logger.warning(f"Не удалось загрузить стикеры ратуш: {e}")
 
 
 async def post_shutdown(application):
