@@ -309,40 +309,41 @@ async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<b>{state_label}</b>",
             f"🏰 <b>{war.clan.name}</b>  ⚔️  <b>{war.opponent.name}</b>",
             f"👥 {war.team_size} vs {war.team_size}   {stars_line}" + time_str,
-            "",
-            "━━━━━━━━━━━━━━━━━━━━",
         ]
 
         if not pending:
-            lines.append("✅ <b>Все игроки использовали свои атаки!</b>")
+            lines.append("\n✅ <b>Все игроки использовали свои атаки!</b>")
         else:
-            # Split into groups: 0 attacks used and 1 attack used
             zero_used = [(m, r) for m, u, r in pending if u == 0]
             one_used  = [(m, r) for m, u, r in pending if u == 1]
 
-            lines.append(f"⏳ <b>Не атаковали — {len(pending)} чел.</b>")
+            lines.append(f"\n⏳ <b>Не атаковали — {len(pending)} чел.</b>")
 
             tg_map = storage.get_tg_username_map()
 
             if zero_used:
-                lines.append("")
-                lines.append(f"🔴 <b>Нет атак ({len(zero_used)}):</b>")
+                lines.append(f"\n🔴 <b>Нет атак ({len(zero_used)}):</b>")
                 for member, _ in zero_used:
                     tg = tg_map.get(member.name.lower())
                     tg_str = f"  <i>@{tg}</i>" if tg else ""
                     lines.append(f"  • {member.name}{tg_str}")
 
             if one_used:
-                lines.append("")
-                lines.append(f"🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
+                lines.append(f"\n🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
                 for member, _ in one_used:
                     tg = tg_map.get(member.name.lower())
                     tg_str = f"  <i>@{tg}</i>" if tg else ""
                     lines.append(f"  • {member.name}{tg_str}")
 
-            lines.append("━━━━━━━━━━━━━━━━━━━━")
+        clan_tag_encoded = CLAN_TAG.replace("#", "%23")
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🌐 Сайт клана", url=CLAN_WEBSITE),
+                InlineKeyboardButton("⚔️ Открыть игру", url=f"https://link.clashofclans.com/en?action=OpenClanProfile&tag={clan_tag_encoded}"),
+            ]
+        ])
 
-        await msg.edit_text("\n".join(lines), parse_mode="HTML")
+        await msg.edit_text("\n".join(lines), parse_mode="HTML", reply_markup=buttons)
 
     except coc.PrivateWarLog:
         await msg.edit_text("🔒 Журнал войны клана закрыт. Невозможно получить данные.")
