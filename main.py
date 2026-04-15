@@ -80,21 +80,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     ])
 
-    # Persistent reply keyboard
-    reply_kb = ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("📋 Список клана"), KeyboardButton("❓ Помощь")],
-            [KeyboardButton("🔗 Привязать аккаунт")],
-        ],
-        resize_keyboard=True,
-        input_field_placeholder="Выбери команду...",
-    )
-
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=inline_kb)
-    await update.message.reply_text(
-        "👇 Меню команд:",
-        reply_markup=reply_kb
-    )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
