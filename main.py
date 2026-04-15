@@ -134,8 +134,9 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             emoji, title = ROLE_BLOCKS.get(role_key, ("🔹", "УЧАСТНИКИ"))
             members_in_role = groups[role_key]
-            block_lines = [f"{emoji} <b>{title}</b>"] + [f"• {name}" for name in members_in_role]
-            lines.append("<blockquote>" + "\n".join(block_lines) + "</blockquote>")
+            lines.append(f"\n{emoji} <b>{title}</b>")
+            for name in members_in_role:
+                lines.append(f"• {name}")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
