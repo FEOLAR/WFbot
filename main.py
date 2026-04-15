@@ -89,6 +89,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━━\n\n"
         "📋 /team\n"
         "   Список всех участников клана с уровнем ратуши\n\n"
+        "⚔️ /kv\n"
+        "   Кто ещё не атаковал в текущей клановой войне\n\n"
         "🔗 /register &lt;ник в CoC&gt;\n"
         "   Привязать свой Telegram к нику в игре\n"
         "   <i>Пример: /register WarriorKing</i>\n\n"
@@ -260,6 +262,59 @@ async def links_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
+async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("⏳ Загружаю данные войны...")
+    try:
+        war = await coc_client.get_current_war(CLAN_TAG)
+
+        if war is None or war.state == "notInWar":
+            await msg.edit_text("🏳️ Клан сейчас не в клановой войне.")
+            return
+
+        if war.state == "preparation":
+            end_time = war.start_time.time.strftime("%d.%m в %H:%M") if war.start_time else "скоро"
+            await msg.edit_text(f"⚙️ Идёт подготовка к войне. Бой начнётся {end_time} (UTC).")
+            return
+
+        attacks_per_member = war.attacks_per_member or 2
+
+        # Collect members who still have attacks left
+        pending = []
+        for member in war.clan.members:
+            used = member.attacks_used
+            remaining = attacks_per_member - used
+            if remaining > 0:
+                pending.append((member, used, remaining))
+
+        # Sort: 0 attacks used first (most urgent), then 1 used
+        pending.sort(key=lambda x: x[1])
+
+        state_label = "⚔️ Война идёт" if war.state == "inWar" else "🏁 Война завершена"
+        lines = [
+            f"{state_label}  ·  {war.clan.name} vs {war.opponent.name}",
+            f"👥 {war.team_size}v{war.team_size}",
+            "─────────────────────",
+        ]
+
+        if not pending:
+            lines.append("\n✅ Все игроки использовали свои атаки!")
+        else:
+            lines.append(f"\n⏳ <b>Не атаковали ({len(pending)} чел.):</b>\n")
+            for member, used, remaining in pending:
+                stars = "🗡" * remaining
+                lines.append(f"  {stars} {member.name}  — осталось {remaining} атак(и)")
+
+        await msg.edit_text("\n".join(lines), parse_mode="HTML")
+
+    except coc.PrivateWarLog:
+        await msg.edit_text("🔒 Журнал войны клана закрыт. Невозможно получить данные.")
+    except coc.NotFound:
+        await msg.edit_text("❌ Клан не найден.")
+    except Exception as e:
+        logger.error(f"Ошибка /kv: {e}")
+        await msg.edit_text("❌ Не удалось загрузить данные войны. Попробуй позже.")
+
+
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     # Route reply-keyboard button presses to the right commands
@@ -286,6 +341,7 @@ async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start",    "🏰 Главное меню"),
         BotCommand("team",     "📋 Список участников клана"),
+        BotCommand("kv",       "⚔️ Атаки в клановой войне"),
         BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
         BotCommand("help",     "❓ Помощь по командам"),
         BotCommand("link",     "🛡 [Адм] Привязать игрока к Telegram"),
@@ -314,6 +370,7 @@ def main():
     app.add_handler(CommandHandler("team", team_command))
     app.add_handler(CommandHandler("register", register_command))
     app.add_handler(CommandHandler("online", online_command))
+    app.add_handler(CommandHandler("kv", kv_command))
     app.add_handler(CommandHandler("link", link_command))
     app.add_handler(CommandHandler("unlink", unlink_command))
     app.add_handler(CommandHandler("links", links_command))
