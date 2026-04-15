@@ -5,7 +5,7 @@ from collections import defaultdict
 import coc
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, KeyboardButton, BotCommand
+    ReplyKeyboardMarkup, KeyboardButton, BotCommand, MenuButtonCommands
 )
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
@@ -306,6 +306,7 @@ async def post_init(application):
         BotCommand("unlink",   "🛡 [Адм] Убрать привязку игрока"),
         BotCommand("links",    "🛡 [Адм] Список всех привязок"),
     ])
+    await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
     logger.info("Команды бота зарегистрированы")
 
 
