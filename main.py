@@ -322,17 +322,23 @@ async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             lines.append(f"⏳ <b>Не атаковали — {len(pending)} чел.</b>")
 
+            tg_map = storage.get_tg_username_map()
+
             if zero_used:
                 lines.append("")
                 lines.append(f"🔴 <b>Нет атак ({len(zero_used)}):</b>")
                 for member, _ in zero_used:
-                    lines.append(f"  • {member.name}")
+                    tg = tg_map.get(member.name.lower())
+                    tg_str = f"  <i>@{tg}</i>" if tg else ""
+                    lines.append(f"  • {member.name}{tg_str}")
 
             if one_used:
                 lines.append("")
                 lines.append(f"🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
                 for member, _ in one_used:
-                    lines.append(f"  • {member.name}")
+                    tg = tg_map.get(member.name.lower())
+                    tg_str = f"  <i>@{tg}</i>" if tg else ""
+                    lines.append(f"  • {member.name}{tg_str}")
 
             lines.append("━━━━━━━━━━━━━━━━━━━━")
 
