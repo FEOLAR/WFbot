@@ -6,6 +6,7 @@ import coc
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
+import image_builder
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -24,19 +25,6 @@ ROLE_ORDER = {
     "admin": 2,
     "member": 3,
 }
-ROLE_BLOCKS = {
-    "leader":   ("👑", "ЛИДЕР"),
-    "coLeader": ("🔱", "СОРУКОВОДИТЕЛИ"),
-    "admin":    ("🌿", "СТАРЕЙШИНЫ"),
-    "member":   ("🔹", "УЧАСТНИКИ"),
-}
-
-TH_CASTLE_EMOJI_ID = "5404525462166739684"
-
-
-def th_sticker(level: int) -> str:
-    return f'<tg-emoji emoji-id="{TH_CASTLE_EMOJI_ID}">🏰</tg-emoji>{level}'
-
 
 coc_client = coc.Client()
 
@@ -130,21 +118,13 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for member in members_sorted:
             groups[member.role.value].append(member)
 
-        lines = [
-            f"🏰 <b>{clan.name}</b>",
-            f"👥 {clan.member_count}/50 участников",
-            "",
-        ]
-
-        for role_key in ["leader", "coLeader", "admin", "member"]:
-            if role_key not in groups:
-                continue
-            emoji, title = ROLE_BLOCKS.get(role_key, ("🔹", "УЧАСТНИКИ"))
-            lines.append(f"\n{emoji} <b>{title}</b>")
-            for m in groups[role_key]:
-                lines.append(f"• {th_sticker(m.town_hall)} {m.name}")
-
-        await msg.edit_text("\n".join(lines), parse_mode="HTML")
+        image_buf = image_builder.build_team_image(clan.name, clan.member_count, groups)
+        await msg.delete()
+        await update.message.reply_photo(
+            photo=image_buf,
+            caption=f"🏰 <b>{clan.name}</b> · {clan.member_count}/50",
+            parse_mode="HTML"
+        )
 
     except coc.NotFound:
         await msg.edit_text("❌ Клан не найден. Проверь тег клана.")
