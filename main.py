@@ -31,33 +31,11 @@ ROLE_BLOCKS = {
     "member":   ("🔹", "УЧАСТНИКИ"),
 }
 
-# Custom emoji IDs for town hall levels from @TownhallsJora sticker pack (TH1-TH17)
-TH_EMOJI_IDS = {
-    1:  "5215364816004226003",
-    2:  "5217906959902088888",
-    3:  "5217821159340413054",
-    4:  "5217703790769116546",
-    5:  "5217522298336090137",
-    6:  "5215451591523477031",
-    7:  "5215186128184845446",
-    8:  "5215510131927720728",
-    9:  "5217572454964172610",
-    10: "5217529475226441576",
-    11: "5217610083172652101",
-    12: "5217622152030753062",
-    13: "5217901702862116140",
-    14: "5217801290821704913",
-    15: "5217691099140753538",
-    16: "5217636754919559423",
-    17: "5217572493618878876",
-}
+TH_CASTLE_EMOJI_ID = "5404525462166739684"
 
 
 def th_sticker(level: int) -> str:
-    emoji_id = TH_EMOJI_IDS.get(level)
-    if emoji_id:
-        return f'<tg-emoji emoji-id="{emoji_id}">🏠</tg-emoji>'
-    return f"🏠{level}"
+    return f'<tg-emoji emoji-id="{TH_CASTLE_EMOJI_ID}">🏰</tg-emoji>{level}'
 
 
 coc_client = coc.Client()
