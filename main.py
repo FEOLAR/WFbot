@@ -6,7 +6,6 @@ import coc
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
-import image_builder
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -118,13 +117,30 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for member in members_sorted:
             groups[member.role.value].append(member)
 
-        image_buf = image_builder.build_team_image(clan.name, clan.member_count, groups)
-        await msg.delete()
-        await update.message.reply_photo(
-            photo=image_buf,
-            caption=f"🏰 <b>{clan.name}</b> · {clan.member_count}/50",
-            parse_mode="HTML"
-        )
+        ROLE_HEADERS = {
+            "leader":   "👑 <b>Лидер</b>",
+            "coLeader": "🔱 <b>Соруководители</b>",
+            "admin":    "🌿 <b>Старейшины</b>",
+            "member":   "🔹 <b>Участники</b>",
+        }
+
+        lines = [
+            f"🏰 <b>{clan.name}</b>  ·  👥 {clan.member_count}/50",
+            "─────────────────────",
+        ]
+
+        for role_key in ["leader", "coLeader", "admin", "member"]:
+            members = groups.get(role_key)
+            if not members:
+                continue
+            lines.append("")
+            lines.append(ROLE_HEADERS[role_key])
+            for m in members:
+                don = m.donations
+                don_str = f"  🏹 {don}" if don else ""
+                lines.append(f"  ТХ{m.town_hall} │ {m.name}{don_str}")
+
+        await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
     except coc.NotFound:
         await msg.edit_text("❌ Клан не найден. Проверь тег клана.")
