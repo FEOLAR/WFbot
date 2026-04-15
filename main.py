@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from collections import defaultdict
 import coc
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
 
@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 COC_EMAIL = os.environ["COC_EMAIL"]
 COC_PASSWORD = os.environ["COC_PASSWORD"]
-CLAN_TAG = "#2R02GGRUJ"
+CLAN_TAG       = "#2R02GGRUJ"
+CLAN_WEBSITE   = "https://warfilcoc.ru"
+TG_GROUP_LINK  = "https://t.me/warfil_clan"   # ← замени на реальную ссылку беседы
 
 ROLE_ORDER = {
     "leader": 0,
@@ -51,12 +53,29 @@ def format_last_seen(last_seen_str: str | None) -> str:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Привет! Я бот клана @warfil_bot.\n\n"
-        "Доступные команды:\n"
-        "/team — активность игроков клана\n"
-        "/help — помощь"
+    user = update.effective_user
+    name = user.first_name or "боец"
+
+    text = (
+        f"👋 Привет, {name}!\n\n"
+        "🏰 <b>Добро пожаловать в бот клана Warfil</b>\n\n"
+        "Я официальный бот клана <b>Warfil</b> в Clash of Clans. Вот что я умею:\n\n"
+        "📋 <b>Список клана</b> — показываю всех участников с уровнем ратуши и ролью\n"
+        "📊 <b>Статистика</b> — слежу за активностью и показателями игроков\n"
+        "📝 <b>Анкеты</b> — принимаю заявки на вступление с сайта клана\n"
+        "🔗 <b>Привязка аккаунтов</b> — связываю CoC-ники с Telegram\n"
+        "🔔 <b>Уведомления</b> — слежу за событиями в клане\n\n"
+        "Используй /help чтобы увидеть все доступные команды."
     )
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🌐 Сайт клана", url=CLAN_WEBSITE),
+            InlineKeyboardButton("💬 Беседа клана", url=TG_GROUP_LINK),
+        ]
+    ])
+
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
