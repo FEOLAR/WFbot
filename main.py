@@ -136,9 +136,7 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lines.append("")
             lines.append(ROLE_HEADERS[role_key])
             for m in members:
-                don = m.donations
-                don_str = f"  🏹 {don}" if don else ""
-                lines.append(f"  ТХ{m.town_hall} │ {m.name}{don_str}")
+                lines.append(f"  ТХ{m.town_hall} │ {m.name}")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
