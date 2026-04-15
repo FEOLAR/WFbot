@@ -3,7 +3,10 @@ import logging
 from datetime import datetime
 from collections import defaultdict
 import coc
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, KeyboardButton, BotCommand
+)
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
 
@@ -57,36 +60,64 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = user.first_name or "боец"
 
     text = (
-        f"👋 Привет, {name}!\n\n"
+        f"👋 Привет, <b>{name}</b>!\n\n"
         "🏰 <b>Добро пожаловать в бот клана Warfil</b>\n\n"
-        "Я официальный бот клана <b>Warfil</b> в Clash of Clans. Вот что я умею:\n\n"
-        "📋 <b>Список клана</b> — показываю всех участников с уровнем ратуши и ролью\n"
-        "📊 <b>Статистика</b> — слежу за активностью и показателями игроков\n"
-        "📝 <b>Анкеты</b> — принимаю заявки на вступление с сайта клана\n"
-        "🔗 <b>Привязка аккаунтов</b> — связываю CoC-ники с Telegram\n"
-        "🔔 <b>Уведомления</b> — слежу за событиями в клане\n\n"
-        "Используй /help чтобы увидеть все доступные команды."
+        "Я официальный бот клана <b>Warfil</b> в Clash of Clans.\n"
+        "Вот что я умею:\n\n"
+        "📋 <b>Список клана</b> — участники с уровнем ратуши и ролью\n"
+        "📊 <b>Статистика</b> — активность и показатели игроков\n"
+        "📝 <b>Анкеты</b> — заявки на вступление с сайта клана\n"
+        "🔗 <b>Привязка аккаунтов</b> — CoC-ники с Telegram\n"
+        "🔔 <b>Уведомления</b> — события в клане\n\n"
+        "⬇️ Используй меню ниже для быстрого доступа к командам."
     )
 
-    keyboard = InlineKeyboardMarkup([
+    # Inline buttons (links)
+    inline_kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🌐 Сайт клана", url=CLAN_WEBSITE),
             InlineKeyboardButton("💬 Беседа клана", url=TG_GROUP_LINK),
         ]
     ])
 
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
+    # Persistent reply keyboard
+    reply_kb = ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("📋 Список клана"), KeyboardButton("❓ Помощь")],
+            [KeyboardButton("🔗 Привязать аккаунт")],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выбери команду...",
+    )
+
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=inline_kb)
+    await update.message.reply_text(
+        "👇 Меню команд:",
+        reply_markup=reply_kb
+    )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Доступные команды:\n\n"
-        "/team — список участников клана\n"
-        "/register <ник в игре> — привязать свой Telegram к нику в CoC\n"
-        "    Пример: /register WarriorKing\n"
-        "    После этого твой @username появится рядом с именем в /team\n\n"
-        "/help — помощь"
+    text = (
+        "📖 <b>Команды бота Warfil</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "📋 /team\n"
+        "   Список всех участников клана с уровнем ратуши\n\n"
+        "🔗 /register &lt;ник в CoC&gt;\n"
+        "   Привязать свой Telegram к нику в игре\n"
+        "   <i>Пример: /register WarriorKing</i>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🛡 <b>Команды администратора</b>\n\n"
+        "🔗 /link @telegram НикВCoC\n"
+        "   Привязать игрока к Telegram\n"
+        "   <i>Пример: /link @feolar Fanon</i>\n\n"
+        "❌ /unlink НикВCoC\n"
+        "   Убрать привязку игрока\n\n"
+        "📋 /links\n"
+        "   Список всех привязок\n"
+        "━━━━━━━━━━━━━━━━━━━━"
     )
+    await update.message.reply_text(text, parse_mode="HTML")
 
 
 async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -244,12 +275,38 @@ async def links_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(update.message.text)
+    text = update.message.text
+    # Route reply-keyboard button presses to the right commands
+    if text == "📋 Список клана":
+        await team_command(update, context)
+    elif text == "❓ Помощь":
+        await help_command(update, context)
+    elif text == "🔗 Привязать аккаунт":
+        await update.message.reply_text(
+            "Чтобы привязать свой аккаунт, напиши:\n"
+            "/register &lt;твой ник в CoC&gt;\n\n"
+            "<i>Пример: /register WarriorKing</i>",
+            parse_mode="HTML"
+        )
+    else:
+        pass  # ignore other text messages
 
 
 async def post_init(application):
     await coc_client.login(COC_EMAIL, COC_PASSWORD)
     logger.info("CoC клиент авторизован")
+
+    # Register bot commands (shown in Telegram command menu)
+    await application.bot.set_my_commands([
+        BotCommand("start",    "🏰 Главное меню"),
+        BotCommand("team",     "📋 Список участников клана"),
+        BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
+        BotCommand("help",     "❓ Помощь по командам"),
+        BotCommand("link",     "🛡 [Адм] Привязать игрока к Telegram"),
+        BotCommand("unlink",   "🛡 [Адм] Убрать привязку игрока"),
+        BotCommand("links",    "🛡 [Адм] Список всех привязок"),
+    ])
+    logger.info("Команды бота зарегистрированы")
 
 
 async def post_shutdown(application):
