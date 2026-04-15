@@ -17,7 +17,7 @@ TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 COC_EMAIL = os.environ["COC_EMAIL"]
 COC_PASSWORD = os.environ["COC_PASSWORD"]
 CLAN_TAG       = "#2R02GGRUJ"
-CLAN_WEBSITE   = "https://www.warfil.com"
+CLAN_WEBSITE   = "https://www.warfilcoc.ru"
 TG_GROUP_LINK  = "https://t.me/warfil_clan"   # ← замени на реальную ссылку беседы
 
 ROLE_ORDER = {
