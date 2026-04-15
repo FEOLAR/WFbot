@@ -17,12 +17,13 @@ def _save(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def register_player(telegram_id: int, coc_name: str):
+def register_player(telegram_id: int, coc_name: str, telegram_username: str | None = None):
     data = _load()
     key = str(telegram_id)
     existing_last_seen = data.get(key, {}).get("last_seen")
     data[key] = {
         "coc_name": coc_name,
+        "telegram_username": telegram_username,
         "last_seen": existing_last_seen,
     }
     _save(data)
@@ -47,6 +48,18 @@ def get_last_seen_map() -> dict[str, str]:
         last_seen = entry.get("last_seen")
         if name:
             result[name.lower()] = last_seen
+    return result
+
+
+def get_tg_username_map() -> dict[str, str]:
+    """Returns {coc_name_lower: telegram_username} for players who linked their account."""
+    data = _load()
+    result = {}
+    for entry in data.values():
+        name = entry.get("coc_name", "")
+        username = entry.get("telegram_username")
+        if name and username:
+            result[name.lower()] = username
     return result
 
 

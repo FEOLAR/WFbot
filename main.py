@@ -61,10 +61,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Доступные команды:\n"
-        "/start — начать\n"
-        "/team — активность игроков клана\n"
-        "    🏹 пожертвования · 🏛️ вклад в столицу · ⭐ звёзды войны\n"
+        "Доступные команды:\n\n"
+        "/team — список участников клана\n"
+        "/register <ник в игре> — привязать свой Telegram к нику в CoC\n"
+        "    Пример: /register WarriorKing\n"
+        "    После этого твой @username появится рядом с именем в /team\n\n"
         "/help — помощь"
     )
 
@@ -79,11 +80,13 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     coc_name = " ".join(context.args)
     user_id = update.effective_user.id
-    storage.register_player(user_id, coc_name)
+    tg_username = update.effective_user.username
+    storage.register_player(user_id, coc_name, tg_username)
     storage.update_last_seen(user_id)
+    linked = f" (@{tg_username})" if tg_username else ""
     await update.message.reply_text(
-        f"✅ Готово! Ты зарегистрирован как <b>{coc_name}</b>.\n"
-        "Теперь пиши /online чтобы отметиться активным.",
+        f"✅ Готово! Ты зарегистрирован как <b>{coc_name}</b>{linked}.\n"
+        "Теперь ты будешь виден в /team со своим Telegram-ником.",
         parse_mode="HTML"
     )
 
@@ -124,6 +127,8 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "member":   "🔹 <b>Участники</b>",
         }
 
+        tg_map = storage.get_tg_username_map()
+
         lines = [
             f"🏰 <b>{clan.name}</b>  ·  👥 {clan.member_count}/50",
             "─────────────────────",
@@ -136,7 +141,9 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lines.append("")
             lines.append(ROLE_HEADERS[role_key])
             for m in members:
-                lines.append(f"  ТХ{m.town_hall} │ {m.name}")
+                tg = tg_map.get(m.name.lower())
+                tg_str = f"  <i>@{tg}</i>" if tg else ""
+                lines.append(f"  ТХ{m.town_hall} │ {m.name}{tg_str}")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
