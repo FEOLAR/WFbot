@@ -1,8 +1,10 @@
 import os
 import logging
+from datetime import datetime
 import coc
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import storage
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -31,11 +33,35 @@ ROLE_NAMES = {
 coc_client = coc.Client()
 
 
+def format_last_seen(last_seen_str: str | None) -> str:
+    if not last_seen_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(last_seen_str)
+        now = datetime.now()
+        diff = now - dt
+        minutes = int(diff.total_seconds() // 60)
+        if minutes < 1:
+            return " • 🟢 только что"
+        elif minutes < 60:
+            return f" • 🕐 {minutes} мин. назад"
+        elif minutes < 1440:
+            hours = minutes // 60
+            return f" • 🕐 {hours} ч. назад"
+        else:
+            days = minutes // 1440
+            return f" • 💤 {days} дн. назад"
+    except Exception:
+        return ""
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет! Я бот клана @warfil_bot.\n\n"
         "Доступные команды:\n"
         "/team — список игроков клана\n"
+        "/register — привязать аккаунт в игре\n"
+        "/online — отметиться онлайн\n"
         "/help — помощь"
     )
 
@@ -45,8 +71,45 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Доступные команды:\n"
         "/start — начать\n"
         "/team — список игроков клана\n"
+        "/register <имя> — привязать своё имя в игре\n"
+        "    Пример: /register WarriorKing\n"
+        "/online — отметиться онлайн\n"
         "/help — помощь"
     )
+
+
+async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "Укажи своё имя в игре.\n"
+            "Пример: /register WarriorKing"
+        )
+        return
+
+    coc_name = " ".join(context.args)
+    user_id = update.effective_user.id
+    storage.register_player(user_id, coc_name)
+    storage.update_last_seen(user_id)
+    await update.message.reply_text(
+        f"✅ Готово! Ты зарегистрирован как <b>{coc_name}</b>.\n"
+        "Теперь пиши /online чтобы отметиться активным.",
+        parse_mode="HTML"
+    )
+
+
+async def online_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    coc_name = storage.update_last_seen(user_id)
+    if coc_name:
+        await update.message.reply_text(
+            f"✅ <b>{coc_name}</b>, твоя активность отмечена!",
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text(
+            "Ты ещё не зарегистрирован.\n"
+            "Используй /register <имя в игре> чтобы привязать аккаунт."
+        )
 
 
 async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,6 +117,7 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         clan = await coc_client.get_clan(CLAN_TAG)
         members = sorted(clan.members, key=lambda m: (ROLE_ORDER.get(m.role.value, 9), -m.trophies))
+        last_seen_map = storage.get_last_seen_map()
 
         lines = [f"🏰 <b>{clan.name}</b> ({clan.tag})", f"👥 Участников: {clan.member_count}/50\n"]
 
@@ -64,7 +128,8 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if role_key != current_role:
                 current_role = role_key
                 lines.append(f"\n{role_label}:")
-            lines.append(f"  {i}. {member.name} — 🏆 {member.trophies}")
+            last_seen = format_last_seen(last_seen_map.get(member.name.lower()))
+            lines.append(f"  {i}. {member.name} — 🏆 {member.trophies}{last_seen}")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
     except coc.NotFound:
@@ -99,6 +164,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("team", team_command))
+    app.add_handler(CommandHandler("register", register_command))
+    app.add_handler(CommandHandler("online", online_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logger.info("Бот запущен...")
