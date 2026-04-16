@@ -1,4 +1,5 @@
 import os
+import asyncio
 import logging
 from datetime import datetime
 from collections import defaultdict
@@ -31,6 +32,82 @@ ROLE_ORDER = {
 }
 
 coc_client = coc.Client()
+
+# Active auto-update tasks: chat_id -> asyncio.Task
+_kv_tasks: dict[int, asyncio.Task] = {}
+
+CLAN_TAG_ENCODED = CLAN_TAG.replace("#", "%23")
+KV_BUTTONS = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("🌐 Сайт клана", url=CLAN_WEBSITE),
+        InlineKeyboardButton("⚔️ Открыть игру", url=f"https://link.clashofclans.com/en?action=OpenClanProfile&tag={CLAN_TAG_ENCODED}"),
+    ]
+])
+
+
+async def build_war_message() -> tuple[str, bool]:
+    """Fetch current war and return (text, should_keep_updating)."""
+    war = await coc_client.get_current_war(CLAN_TAG)
+
+    if war is None or war.state == "notInWar":
+        return "🏳️ Клан сейчас не в клановой войне.", False
+
+    if war.state == "preparation":
+        start = war.start_time.time.strftime("%d.%m в %H:%M") if war.start_time else "скоро"
+        return f"⚙️ Идёт подготовка к войне. Бой начнётся {start} (UTC).", False
+
+    attacks_per_member = war.attacks_per_member or 2
+    pending = []
+    for member in war.clan.members:
+        used = len(member.attacks) if member.attacks else 0
+        remaining = attacks_per_member - used
+        if remaining > 0:
+            pending.append((member, used, remaining))
+    pending.sort(key=lambda x: x[1])
+
+    state_label = "⚔️ Война идёт" if war.state == "inWar" else "🏁 Война завершена"
+    our_stars = war.clan.stars
+    their_stars = war.opponent.stars
+    stars_line = f"⭐ {our_stars}  vs  {their_stars} ⭐"
+
+    time_str = ""
+    if war.state == "inWar" and war.end_time:
+        now = datetime.utcnow()
+        diff = war.end_time.time - now
+        total_sec = max(int(diff.total_seconds()), 0)
+        h, m = divmod(total_sec // 60, 60)
+        time_str = f"\n⏱ До конца войны: <b>{h}ч {m}мин</b>"
+
+    lines = [
+        f"<b>{state_label}</b>",
+        f"🏰 <b>{war.clan.name}</b>  ⚔️  <b>{war.opponent.name}</b>",
+        f"👥 {war.team_size} vs {war.team_size}   {stars_line}" + time_str,
+    ]
+
+    if not pending:
+        lines.append("\n✅ <b>Все игроки использовали свои атаки!</b>")
+    else:
+        zero_used = [(mb, r) for mb, u, r in pending if u == 0]
+        one_used  = [(mb, r) for mb, u, r in pending if u == 1]
+        lines.append(f"\n⏳ <b>Не атаковали — {len(pending)} чел.</b>")
+        tg_map = storage.get_tg_username_map()
+
+        if zero_used:
+            lines.append(f"\n🔴 <b>Нет атак ({len(zero_used)}):</b>")
+            for member, _ in zero_used:
+                tg = tg_map.get(member.name.lower())
+                tg_str = f"  <i>@{tg}</i>" if tg else ""
+                lines.append(f"  • {member.name}{tg_str}")
+
+        if one_used:
+            lines.append(f"\n🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
+            for member, _ in one_used:
+                tg = tg_map.get(member.name.lower())
+                tg_str = f"  <i>@{tg}</i>" if tg else ""
+                lines.append(f"  • {member.name}{tg_str}")
+
+    keep_updating = war.state == "inWar"
+    return "\n".join(lines), keep_updating
 
 
 def format_last_seen(last_seen_str: str | None) -> str:
@@ -263,95 +340,51 @@ async def links_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def kv_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+
+    # Cancel any existing auto-update task for this chat
+    existing = _kv_tasks.get(chat_id)
+    if existing and not existing.done():
+        existing.cancel()
+
     msg = await update.message.reply_text("⏳ Загружаю данные войны...")
+
     try:
-        war = await coc_client.get_current_war(CLAN_TAG)
-
-        if war is None or war.state == "notInWar":
-            await msg.edit_text("🏳️ Клан сейчас не в клановой войне.")
-            return
-
-        if war.state == "preparation":
-            end_time = war.start_time.time.strftime("%d.%m в %H:%M") if war.start_time else "скоро"
-            await msg.edit_text(f"⚙️ Идёт подготовка к войне. Бой начнётся {end_time} (UTC).")
-            return
-
-        attacks_per_member = war.attacks_per_member or 2
-
-        # Collect members who still have attacks left
-        pending = []
-        for member in war.clan.members:
-            used = len(member.attacks) if member.attacks else 0
-            remaining = attacks_per_member - used
-            if remaining > 0:
-                pending.append((member, used, remaining))
-
-        # Sort: 0 attacks used first (most urgent), then 1 used
-        pending.sort(key=lambda x: x[1])
-
-        state_label = "⚔️ Война идёт" if war.state == "inWar" else "🏁 Война завершена"
-
-        # Clan stars
-        our_stars = war.clan.stars
-        their_stars = war.opponent.stars
-        stars_line = f"⭐ {our_stars}  vs  {their_stars} ⭐"
-
-        # Time remaining
-        time_str = ""
-        if war.state == "inWar" and war.end_time:
-            now = datetime.utcnow()
-            diff = war.end_time.time - now
-            total_sec = max(int(diff.total_seconds()), 0)
-            h, m = divmod(total_sec // 60, 60)
-            time_str = f"\n⏱ До конца войны: <b>{h}ч {m}мин</b>"
-
-        lines = [
-            f"<b>{state_label}</b>",
-            f"🏰 <b>{war.clan.name}</b>  ⚔️  <b>{war.opponent.name}</b>",
-            f"👥 {war.team_size} vs {war.team_size}   {stars_line}" + time_str,
-        ]
-
-        if not pending:
-            lines.append("\n✅ <b>Все игроки использовали свои атаки!</b>")
-        else:
-            zero_used = [(m, r) for m, u, r in pending if u == 0]
-            one_used  = [(m, r) for m, u, r in pending if u == 1]
-
-            lines.append(f"\n⏳ <b>Не атаковали — {len(pending)} чел.</b>")
-
-            tg_map = storage.get_tg_username_map()
-
-            if zero_used:
-                lines.append(f"\n🔴 <b>Нет атак ({len(zero_used)}):</b>")
-                for member, _ in zero_used:
-                    tg = tg_map.get(member.name.lower())
-                    tg_str = f"  <i>@{tg}</i>" if tg else ""
-                    lines.append(f"  • {member.name}{tg_str}")
-
-            if one_used:
-                lines.append(f"\n🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
-                for member, _ in one_used:
-                    tg = tg_map.get(member.name.lower())
-                    tg_str = f"  <i>@{tg}</i>" if tg else ""
-                    lines.append(f"  • {member.name}{tg_str}")
-
-        clan_tag_encoded = CLAN_TAG.replace("#", "%23")
-        buttons = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🌐 Сайт клана", url=CLAN_WEBSITE),
-                InlineKeyboardButton("⚔️ Открыть игру", url=f"https://link.clashofclans.com/en?action=OpenClanProfile&tag={clan_tag_encoded}"),
-            ]
-        ])
-
-        await msg.edit_text("\n".join(lines), parse_mode="HTML", reply_markup=buttons)
-
+        text, keep_updating = await build_war_message()
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=KV_BUTTONS)
     except coc.PrivateWarLog:
-        await msg.edit_text("🔒 Журнал войны клана закрыт. Невозможно получить данные.")
+        await msg.edit_text("🔒 Журнал войны клана закрыт.")
+        return
     except coc.NotFound:
         await msg.edit_text("❌ Клан не найден.")
+        return
     except Exception as e:
         logger.error(f"Ошибка /kv: {e}")
         await msg.edit_text("❌ Не удалось загрузить данные войны. Попробуй позже.")
+        return
+
+    if not keep_updating:
+        return
+
+    async def auto_update():
+        while True:
+            await asyncio.sleep(5)
+            try:
+                new_text, still_going = await build_war_message()
+                try:
+                    await msg.edit_text(new_text, parse_mode="HTML", reply_markup=KV_BUTTONS)
+                except Exception:
+                    pass  # Message not modified or deleted — skip silently
+                if not still_going:
+                    break
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Ошибка авто-обновления /kv: {e}")
+                break
+
+    task = asyncio.create_task(auto_update())
+    _kv_tasks[chat_id] = task
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
