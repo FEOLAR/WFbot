@@ -505,26 +505,26 @@ async def war_state_monitor(bot):
 
 
 async def war_auto_broadcast(bot):
-    """Send a new war status message every 5 seconds while war is active."""
+    """Send a new war status message to WAR_NOTIFY_CHAT every 7200 seconds while war is active."""
     while True:
+        await asyncio.sleep(7200)  # 2 часа — ждём СНАЧАЛА, чтобы не слать при каждом перезапуске
         try:
             chat_id = storage.get_notify_chat()
-            if chat_id:
-                text, keep_going = await build_war_message()
-                if keep_going:
-                    await bot.send_message(
-                        chat_id=chat_id,
-                        text=text,
-                        parse_mode="HTML",
-                        reply_markup=KV_BUTTONS,
-                    )
-            else:
+            if not chat_id:
                 logger.debug("war_auto_broadcast: chat_id not set yet, waiting...")
+                continue
+            text, keep_going = await build_war_message()
+            if keep_going:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    parse_mode="HTML",
+                    reply_markup=KV_BUTTONS,
+                )
         except asyncio.CancelledError:
             break
         except Exception as e:
             logger.warning(f"war_auto_broadcast: {e}")
-        await asyncio.sleep(7200)  # 2 часа
 
 
 def _is_feolar(update: Update) -> bool:

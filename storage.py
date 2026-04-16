@@ -147,5 +147,8 @@ def save_war_state(state: str):
 def get_war_state() -> str | None:
     if not os.path.exists(WAR_STATE_FILE):
         return None
-    with open(WAR_STATE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f).get("state")
+    try:
+        with open(WAR_STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f).get("state")
+    except (json.JSONDecodeError, KeyError):
+        return None
