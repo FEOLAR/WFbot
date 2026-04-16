@@ -249,15 +249,20 @@ def build_raids_sheet(ws, raids: list):
         _header_cell(ws, 2, col,     label, bg=BLUE)
         _header_cell(ws, 2, col + 1, "Золото", bg=BLUE)
 
-    # Collect members from all raids (use first raid with members as reference)
-    all_members: dict[str, dict] = {}
+    # Convert members to lists once (coc.py may return iterators)
+    raid_members: list[list] = []
     for raid in raids:
         try:
-            for m in (raid.members or []):
-                if m.name not in all_members:
-                    all_members[m.name] = {}
+            raid_members.append(list(raid.members or []))
         except Exception:
-            pass
+            raid_members.append([])
+
+    # Collect all unique player names
+    all_members: dict[str, dict] = {}
+    for members in raid_members:
+        for m in members:
+            if m.name not in all_members:
+                all_members[m.name] = {}
 
     if not all_members:
         ws.cell(row=3, column=1, value="Нет данных по участникам")
@@ -268,24 +273,18 @@ def build_raids_sheet(ws, raids: list):
         _data_cell(ws, row, 1, player_name, align="left")
         # limit column — take from first raid that has this member
         limit_shown = "—"
-        for raid in raids:
-            try:
-                member_map = {m.name: m for m in (raid.members or [])}
-                if player_name in member_map:
-                    m0 = member_map[player_name]
-                    limit_val = (getattr(m0, "attack_limit", 0) or 0) + (getattr(m0, "bonus_attack_limit", 0) or 0)
-                    limit_shown = str(limit_val)
-                    break
-            except Exception:
-                pass
+        for members in raid_members:
+            member_map = {m.name: m for m in members}
+            if player_name in member_map:
+                m0 = member_map[player_name]
+                limit_val = (getattr(m0, "attack_limit", 0) or 0) + (getattr(m0, "bonus_attack_limit", 0) or 0)
+                limit_shown = str(limit_val)
+                break
         _data_cell(ws, row, 2, limit_shown)
 
-        for i, raid in enumerate(raids):
+        for i, members in enumerate(raid_members):
             col = 3 + i * 2
-            try:
-                member_map = {m.name: m for m in (raid.members or [])}
-            except Exception:
-                member_map = {}
+            member_map = {m.name: m for m in members}
 
             if player_name in member_map:
                 m = member_map[player_name]
