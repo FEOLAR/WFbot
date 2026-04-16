@@ -1,6 +1,8 @@
 import os
 import asyncio
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 from collections import defaultdict
 import coc
@@ -1095,7 +1097,26 @@ async def post_shutdown(application):
     await coc_client.close()
 
 
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        pass
+
+
+def _start_health_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info(f"Health check server listening on port {port}")
+
+
 def main():
+    _start_health_server()
     app = (
         ApplicationBuilder()
         .token(TOKEN)

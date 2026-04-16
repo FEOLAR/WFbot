@@ -12,7 +12,7 @@ requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
 run = ["python", "main.py"]
-deploymentTarget = "vm"
+deploymentTarget = "autoscale"
 
 [agent]
 expertMode = true
