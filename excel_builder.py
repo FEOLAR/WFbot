@@ -146,17 +146,17 @@ def build_kv_sheet(ws, war_history: list[dict], clan_members: list[dict] = None)
 # Sheet 2: ЛВК (current CWL season rounds)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_cwl_sheet(ws, cwl_history: dict, sheet_index: int = 0):
+def build_cwl_sheet(ws, cwl_history: dict, sheet_index: int = 0, clan_members: list = None):
     season = cwl_history.get("season") or "—"
-    label = "Текущий" if sheet_index == 0 else "Прошлый"
-    ws.title = f"ЛВК {season}"[:31]  # Excel sheet name max 31 chars
+    season_label = "Текущий" if sheet_index == 0 else "Прошлый"
+    ws.title = f"ЛВК {season}"[:31]
 
     rounds = cwl_history.get("rounds", [])
     n_rounds = len(rounds)
 
     total_cols = max(3, 2 + n_rounds)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
-    _header_cell(ws, 1, 1, f"🏆 ЛВК — {label} сезон {season}", bg=DARK)
+    _header_cell(ws, 1, 1, f"🏆 ЛВК — {season_label} сезон {season}", bg=DARK)
 
     _header_cell(ws, 2, 1, "Игрок", bg=BLUE)
     _header_cell(ws, 2, 2, "Атак", bg=BLUE)
@@ -168,11 +168,14 @@ def build_cwl_sheet(ws, cwl_history: dict, sheet_index: int = 0):
         their_s = rnd.get("their_stars", 0)
         state = rnd.get("state", "")
         status = "" if state in ("warEnded", "war_ended") else " ⏳"
-        label = f"Раунд {rnd['round']}\nvs {opp_short}\n⭐{our_s}:{their_s}{status}"
-        _header_cell(ws, 2, col, label, bg=BLUE)
+        rnd_label = f"Раунд {rnd['round']}\nvs {opp_short}\n⭐{our_s}:{their_s}{status}"
+        _header_cell(ws, 2, col, rnd_label, bg=BLUE)
 
-    # Gather all players
+    # Gather all players: start from clan roster, then overlay round data
     all_players: dict[str, list] = {}
+    if clan_members:
+        for m in clan_members:
+            all_players[m["name"]] = [None] * n_rounds
     for rnd in rounds:
         for m in rnd.get("members", []):
             name = m["name"]
@@ -189,17 +192,21 @@ def build_cwl_sheet(ws, cwl_history: dict, sheet_index: int = 0):
     for player_name in sorted(all_players.keys()):
         attacks = all_players[player_name]
         total_attacked = sum(1 for a in attacks if a is True)
-        total_rounds = sum(1 for a in attacks if a is not None)
+        total_rounds_known = sum(1 for a in attacks if a is not None)
         _data_cell(ws, row, 1, player_name, align="left")
-        pct = int(total_attacked / total_rounds * 100) if total_rounds else 0
-        _data_cell(ws, row, 2,
-                   f"{total_attacked}/{n_rounds} ({pct}%)",
-                   bg=GREEN if pct == 100 else (RED if pct == 0 else ORANGE),
-                   bold=True)
-        for i, attacked in enumerate(attacks):
+        if n_rounds == 0 or total_rounds_known == 0:
+            _data_cell(ws, row, 2, "н/д", bg=GRAY)
+        else:
+            pct = int(total_attacked / total_rounds_known * 100)
+            _data_cell(ws, row, 2,
+                       f"{total_attacked}/{n_rounds} ({pct}%)",
+                       bg=GREEN if pct == 100 else (RED if pct == 0 else ORANGE),
+                       bold=True)
+        for i in range(n_rounds):
             col = 3 + i
+            attacked = attacks[i]
             if attacked is None:
-                _data_cell(ws, row, col, "—", bg=GRAY)
+                _data_cell(ws, row, col, "н/д", bg=GRAY)
             else:
                 _data_cell(ws, row, col, "✅" if attacked else "❌",
                            bg=GREEN if attacked else RED)
@@ -319,10 +326,10 @@ def build_excel(war_history: list[dict], cwl_seasons: list[dict], raids: list,
     if cwl_seasons:
         for i, season_data in enumerate(cwl_seasons):
             ws_cwl = wb.create_sheet()
-            build_cwl_sheet(ws_cwl, season_data, sheet_index=i)
+            build_cwl_sheet(ws_cwl, season_data, sheet_index=i, clan_members=clan_members)
     else:
         ws_cwl = wb.create_sheet()
-        build_cwl_sheet(ws_cwl, {"season": None, "rounds": []}, sheet_index=0)
+        build_cwl_sheet(ws_cwl, {"season": None, "rounds": []}, sheet_index=0, clan_members=clan_members)
 
     ws_raids = wb.create_sheet()
     build_raids_sheet(ws_raids, raids)
