@@ -413,6 +413,98 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass  # ignore other text messages
 
 
+async def send_war_start(bot, chat_id: int, war):
+    opponent = war.opponent.name if war.opponent else "противника"
+    text = (
+        "⚔️🔥 <b>ВОЙНА НАЧАЛАСЬ!</b> 🔥⚔️\n\n"
+        f"🏰 <b>Warfil</b>  vs  <b>{opponent}</b>\n"
+        f"👥 {war.team_size} на {war.team_size}\n\n"
+        "💥 Боевой день открыт — время показать, на что мы способны!\n\n"
+        "🏆 Желаем красивых атак и славных побед!\n"
+        "⚡ Атакуйте с умом, сражайтесь с честью!\n\n"
+        "<b>Покажем им силу клана Warfil!</b> 💪"
+    )
+    await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=KV_BUTTONS)
+
+
+async def send_war_end(bot, chat_id: int, war):
+    attacks_per_member = war.attacks_per_member or 2
+    tg_map = storage.get_tg_username_map()
+
+    attacked = []
+    missed = []
+    for member in war.clan.members:
+        used = len(member.attacks) if member.attacks else 0
+        if used >= attacks_per_member:
+            attacked.append(member)
+        else:
+            missed.append((member, used))
+
+    our_stars = war.clan.stars
+    their_stars = war.opponent.stars
+    if our_stars > their_stars:
+        result_line = "🏆 <b>Победа!</b>"
+    elif our_stars < their_stars:
+        result_line = "😔 <b>Поражение.</b>"
+    else:
+        result_line = "🤝 <b>Ничья.</b>"
+
+    lines = [
+        "🏁 <b>ВОЙНА ЗАВЕРШЕНА!</b>\n",
+        f"🏰 <b>Warfil</b>  vs  <b>{war.opponent.name}</b>",
+        f"⭐ {our_stars}  vs  {their_stars} ⭐  —  {result_line}",
+    ]
+
+    if attacked:
+        lines.append(f"\n✅ <b>Атаковали ({len(attacked)}):</b>")
+        for member in attacked:
+            tg = tg_map.get(member.name.lower())
+            tg_str = f"  <i>@{tg}</i>" if tg else ""
+            lines.append(f"  • {member.name}{tg_str}")
+        lines.append("\n🔥 Молодцы, продолжайте в том же духе! Вы — гордость клана! 💪")
+
+    if missed:
+        lines.append(f"\n❌ <b>Не атаковали ({len(missed)}):</b>")
+        for member, used in missed:
+            tg = tg_map.get(member.name.lower())
+            tg_str = f"  <i>@{tg}</i>" if tg else ""
+            used_str = f" (использовал {used}/{attacks_per_member})" if used > 0 else ""
+            lines.append(f"  • {member.name}{tg_str}{used_str}")
+        lines.append("\n⚠️ <b>Данные игроки попадают в номинацию на кик из клана!</b>")
+
+    await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="HTML", reply_markup=KV_BUTTONS)
+
+
+async def war_state_monitor(bot):
+    """Poll war state every 60 s; send messages on transitions."""
+    previous_state = storage.get_war_state()  # restore across restarts
+
+    while True:
+        await asyncio.sleep(60)
+        try:
+            chat_id = storage.get_notify_chat()
+            if not chat_id:
+                continue
+
+            war = await coc_client.get_current_war(CLAN_TAG)
+            current_state = war.state if war else "notInWar"
+
+            if previous_state is not None and previous_state != current_state:
+                if previous_state == "preparation" and current_state == "inWar":
+                    await send_war_start(bot, chat_id, war)
+                elif previous_state == "inWar" and current_state == "warEnded":
+                    await send_war_end(bot, chat_id, war)
+
+            if current_state != previous_state:
+                storage.save_war_state(current_state)
+                previous_state = current_state
+
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"war_state_monitor: {e}")
+
+
 async def war_auto_broadcast(bot):
     """Send a new war status message every 5 seconds while war is active."""
     while True:
@@ -441,6 +533,7 @@ async def post_init(application):
     logger.info("CoC клиент авторизован")
 
     asyncio.create_task(war_auto_broadcast(application.bot))
+    asyncio.create_task(war_state_monitor(application.bot))
     logger.info("Авто-рассылка войны запущена")
 
     # Register bot commands (shown in Telegram command menu)

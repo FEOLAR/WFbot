@@ -132,3 +132,20 @@ def get_notify_chat() -> int | None:
     with open(NOTIFY_CHAT_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data.get("chat_id")
+
+
+# ── War state persistence (for transition detection across restarts) ───────────
+
+WAR_STATE_FILE = "war_state.json"
+
+
+def save_war_state(state: str):
+    with open(WAR_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"state": state}, f)
+
+
+def get_war_state() -> str | None:
+    if not os.path.exists(WAR_STATE_FILE):
+        return None
+    with open(WAR_STATE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f).get("state")
