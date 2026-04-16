@@ -50,7 +50,7 @@ def _data_cell(ws, row, col, value, bg=None, bold=False, align="center"):
 # Each war = 2 columns: "1-я атака" and "2-я атака" (✅/❌ per slot)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_kv_sheet(ws, war_history: list[dict]):
+def build_kv_sheet(ws, war_history: list[dict], clan_members: list[dict] = None):
     ws.title = "КВ (Клановые войны)"
 
     wars = war_history[:5]
@@ -79,12 +79,18 @@ def build_kv_sheet(ws, war_history: list[dict]):
         _header_cell(ws, 2, col + 2, "2-я атака", bg=BLUE)
 
     # Gather all unique players with TH level
+    # Start with clan members as base (always visible), then overlay war data
     all_players: dict[str, int] = {}
+    if clan_members:
+        for m in clan_members:
+            all_players[m["name"]] = m.get("th", 0)
     for war in wars:
         for m in war.get("members", []):
             name = m["name"]
             if name not in all_players:
                 all_players[name] = m.get("th", 0)
+            elif m.get("th"):
+                all_players[name] = m["th"]
 
     row = 3
     for player_name in sorted(all_players.keys()):
@@ -302,11 +308,12 @@ def build_raids_sheet(ws, raids: list):
 # cwl_seasons: list of {"season": str, "rounds": [...]} – newest first
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_excel(war_history: list[dict], cwl_seasons: list[dict], raids: list) -> io.BytesIO:
+def build_excel(war_history: list[dict], cwl_seasons: list[dict], raids: list,
+                clan_members: list[dict] = None) -> io.BytesIO:
     wb = openpyxl.Workbook()
 
     ws_kv = wb.active
-    build_kv_sheet(ws_kv, war_history)
+    build_kv_sheet(ws_kv, war_history, clan_members=clan_members)
 
     # One CWL sheet per season
     if cwl_seasons:

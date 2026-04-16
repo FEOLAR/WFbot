@@ -490,9 +490,65 @@ async def send_war_end(bot, chat_id: int, war):
     await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="HTML", reply_markup=KV_BUTTONS)
 
 
+async def _try_save_war_ended(war):
+    """If war is warEnded and not yet saved locally, save it now."""
+    if not war or war.state != "warEnded":
+        return
+    try:
+        clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+        our = war.clan if war.clan.tag.lstrip("#").upper() == clan_tag_clean else war.opponent
+        opp = war.opponent if our is war.clan else war.clan
+        end_iso = war.end_time.time.isoformat() if war.end_time else ""
+        if not end_iso:
+            return
+        existing = stats_storage.get_war_history()
+        if any(w.get("end_time", "")[:16] == end_iso[:16] for w in existing):
+            return  # already saved
+        # Determine result
+        if our.stars > opp.stars:
+            result = "win"
+        elif our.stars < opp.stars:
+            result = "lose"
+        elif (our.destruction or 0) > (opp.destruction or 0):
+            result = "win"
+        elif (our.destruction or 0) < (opp.destruction or 0):
+            result = "lose"
+        else:
+            result = "tie"
+        members = []
+        for m in (our.members or []):
+            members.append({
+                "name": m.name,
+                "th": getattr(m, "town_hall", 0),
+                "attacks_used": len(m.attacks) if m.attacks else 0,
+                "attacks_max": war.attacks_per_member,
+            })
+        stats_storage.save_war_result(
+            end_time=end_iso,
+            opponent=opp.name,
+            result=result,
+            our_stars=our.stars,
+            their_stars=opp.stars,
+            team_size=war.team_size,
+            attacks_per_member=war.attacks_per_member,
+            members=members,
+        )
+        logger.info(f"Auto-saved warEnded: vs {opp.name} at {end_iso[:10]}")
+    except Exception as e:
+        logger.warning(f"_try_save_war_ended: {e}")
+
+
 async def war_state_monitor(bot):
     """Poll war state every 60 s; send messages on transitions."""
     previous_state = storage.get_war_state()  # restore across restarts
+
+    # On startup: if war is already ended, save data immediately (bot may have missed the transition)
+    try:
+        startup_war = await coc_client.get_current_war(CLAN_TAG)
+        if startup_war and startup_war.state == "warEnded":
+            await _try_save_war_ended(startup_war)
+    except Exception:
+        pass
 
     while True:
         await asyncio.sleep(60)
@@ -509,6 +565,10 @@ async def war_state_monitor(bot):
                     await send_war_start(bot, chat_id, war)
                 elif previous_state == "inWar" and current_state == "warEnded":
                     await send_war_end(bot, chat_id, war)
+
+            # Also auto-save if we see warEnded state (belt-and-suspenders)
+            if current_state == "warEnded":
+                await _try_save_war_ended(war)
 
             if current_state != previous_state:
                 storage.save_war_state(current_state)
@@ -613,25 +673,45 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return "lose"
             return "tie"
 
-        # ── 1. КВ: war log (5 regular wars) + live player data overlay ─────────
-        # Build player data index from saved history (key = end_time[:16])
-        saved_wars = stats_storage.get_war_history()
-        player_data_by_time: dict[str, list] = {}
-        for sw in saved_wars:
-            key = sw.get("end_time", "")[:16]
-            if key and sw.get("members"):
-                player_data_by_time[key] = sw["members"]
+        # ── Fetch clan member list (always available, used as player row fallback) ──
+        clan_members: list[dict] = []
+        try:
+            clan = await coc_client.get_clan(CLAN_TAG)
+            for m in (clan.members or []):
+                clan_members.append({"name": m.name, "th": getattr(m, "town_hall", 0)})
+        except Exception as e:
+            logger.warning(f"Clan members: {e}")
 
-        # Fetch current war for live player data
+        # ── 1. КВ: war log (5 regular wars) + live player data overlay ─────────
+        # Index from saved history: (end_time[:16], opponent_name) → members
+        saved_wars = stats_storage.get_war_history()
+        player_by_time: dict[str, list] = {}
+        player_by_opp: dict[str, list] = {}
+        for sw in saved_wars:
+            key_t = sw.get("end_time", "")[:16]
+            key_o = sw.get("opponent", "").strip().lower()
+            if sw.get("members"):
+                if key_t:
+                    player_by_time[key_t] = sw["members"]
+                if key_o:
+                    player_by_opp[key_o] = sw["members"]
+
+        # Fetch current war for live player data and auto-save if warEnded
         try:
             cw = await coc_client.get_current_war(CLAN_TAG)
             if cw and cw.state in ("inWar", "warEnded"):
                 cw_end = cw.end_time.time.isoformat() if cw.end_time else ""
+                members_live = _war_members(cw)
                 if cw_end:
-                    player_data_by_time[cw_end[:16]] = _war_members(cw)
+                    player_by_time[cw_end[:16]] = members_live
+                opp_name = (cw.opponent.name if cw.opponent else "").strip().lower()
+                if opp_name:
+                    player_by_opp[opp_name] = members_live
+                # Auto-save warEnded war if not already saved
+                if cw.state == "warEnded":
+                    await _try_save_war_ended(cw)
         except Exception as e:
             logger.warning(f"Текущая КВ: {e}")
-            cw = None
 
         # Fetch war log for the last 5 regular wars (summaries)
         war_history: list[dict] = []
@@ -646,16 +726,19 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     result_str = entry.result.value if hasattr(entry.result, "value") else str(entry.result).lower()
                 except Exception:
                     pass
-                key = end_iso[:16]
-                members = player_data_by_time.get(key, [])
-                our_stars = entry.clan.stars if entry.clan else 0
-                their_stars = entry.opponent.stars if entry.opponent else 0
+                opp_name = (entry.opponent.name or "").strip()
+                # Match player data by time first, then by opponent name
+                key_t = end_iso[:16]
+                key_o = opp_name.lower()
+                members = (player_by_time.get(key_t)
+                           or player_by_opp.get(key_o)
+                           or [])
                 war_history.append({
                     "end_time": end_iso,
-                    "opponent": entry.opponent.name if entry.opponent else "—",
+                    "opponent": opp_name or "—",
                     "result": result_str,
-                    "our_stars": our_stars,
-                    "their_stars": their_stars,
+                    "our_stars": entry.clan.stars if entry.clan else 0,
+                    "their_stars": entry.opponent.stars if entry.opponent else 0,
                     "team_size": entry.team_size or 0,
                     "attacks_per_member": entry.attacks_per_member or 2,
                     "members": members,
@@ -664,10 +747,8 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     break
         except Exception as e:
             logger.warning(f"War log error: {e}")
-            # Fall back to saved history if war log fails
             war_history = saved_wars[:5]
 
-        # If war log returned nothing, fall back to saved + current war
         if not war_history:
             war_history = saved_wars[:5]
 
@@ -725,7 +806,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.warning(f"Рейды: {e}")
 
-        buf = excel_builder.build_excel(war_history, cwl_seasons, raids)
+        buf = excel_builder.build_excel(war_history, cwl_seasons, raids, clan_members=clan_members)
         n_cwl_rounds = sum(len(s.get("rounds", [])) for s in cwl_seasons)
         await update.message.reply_document(
             document=buf,
