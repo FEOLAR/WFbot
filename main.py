@@ -433,7 +433,7 @@ async def war_auto_broadcast(bot):
             break
         except Exception as e:
             logger.warning(f"war_auto_broadcast: {e}")
-        await asyncio.sleep(5)
+        await asyncio.sleep(7200)  # 2 часа
 
 
 async def post_init(application):
