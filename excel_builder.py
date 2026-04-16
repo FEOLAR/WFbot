@@ -57,7 +57,7 @@ def build_kv_sheet(ws, war_history: list[dict]):
     n_wars = len(wars)
 
     # Total columns: 2 (player, TH) + n_wars * 3 (1st atk, 2nd atk, %)
-    total_cols = 2 + n_wars * 3
+    total_cols = max(5, 2 + n_wars * 3)
 
     # Row 1: Title
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
@@ -140,16 +140,17 @@ def build_kv_sheet(ws, war_history: list[dict]):
 # Sheet 2: ЛВК (current CWL season rounds)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_cwl_sheet(ws, cwl_history: dict):
-    ws.title = "ЛВК (Лига войн клана)"
-
+def build_cwl_sheet(ws, cwl_history: dict, sheet_index: int = 0):
     season = cwl_history.get("season") or "—"
+    label = "Текущий" if sheet_index == 0 else "Прошлый"
+    ws.title = f"ЛВК {season}"[:31]  # Excel sheet name max 31 chars
+
     rounds = cwl_history.get("rounds", [])
     n_rounds = len(rounds)
 
-    total_cols = 2 + n_rounds
+    total_cols = max(3, 2 + n_rounds)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
-    _header_cell(ws, 1, 1, f"🏆 ЛИГА ВОЙН КЛАНА — сезон {season}", bg=DARK)
+    _header_cell(ws, 1, 1, f"🏆 ЛВК — {label} сезон {season}", bg=DARK)
 
     _header_cell(ws, 2, 1, "Игрок", bg=BLUE)
     _header_cell(ws, 2, 2, "Атак", bg=BLUE)
@@ -298,16 +299,23 @@ def build_raids_sheet(ws, raids: list):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main entry point
+# cwl_seasons: list of {"season": str, "rounds": [...]} – newest first
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_excel(war_history: list[dict], cwl_history: dict, raids: list) -> io.BytesIO:
+def build_excel(war_history: list[dict], cwl_seasons: list[dict], raids: list) -> io.BytesIO:
     wb = openpyxl.Workbook()
 
     ws_kv = wb.active
     build_kv_sheet(ws_kv, war_history)
 
-    ws_cwl = wb.create_sheet()
-    build_cwl_sheet(ws_cwl, cwl_history)
+    # One CWL sheet per season
+    if cwl_seasons:
+        for i, season_data in enumerate(cwl_seasons):
+            ws_cwl = wb.create_sheet()
+            build_cwl_sheet(ws_cwl, season_data, sheet_index=i)
+    else:
+        ws_cwl = wb.create_sheet()
+        build_cwl_sheet(ws_cwl, {"season": None, "rounds": []}, sheet_index=0)
 
     ws_raids = wb.create_sheet()
     build_raids_sheet(ws_raids, raids)

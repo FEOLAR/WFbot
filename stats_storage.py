@@ -5,6 +5,7 @@ WAR_HISTORY_FILE = "war_history.json"
 CWL_HISTORY_FILE = "cwl_history.json"
 
 MAX_WAR_ENTRIES = 5
+MAX_CWL_SEASONS = 2
 
 
 def _load_json(path):
@@ -48,26 +49,62 @@ def get_war_history() -> list[dict]:
     return _load_json(WAR_HISTORY_FILE) or []
 
 
-# ── CWL history ───────────────────────────────────────────────────────────────
+# ── CWL history (keeps last MAX_CWL_SEASONS seasons) ─────────────────────────
 
 def save_cwl_round(season: str, round_num: int, opponent: str,
                    our_stars: int, their_stars: int,
                    members: list[dict]):
-    """Append a finished CWL round to the current season's history."""
-    data = _load_json(CWL_HISTORY_FILE) or {"season": season, "rounds": []}
+    """Append a finished CWL round to the season history. Keeps last MAX_CWL_SEASONS seasons."""
+    raw = _load_json(CWL_HISTORY_FILE)
 
-    if data.get("season") != season:
-        data = {"season": season, "rounds": []}
+    # Migrate old format {"season": ..., "rounds": [...]} → new list format
+    if isinstance(raw, dict) and "season" in raw:
+        seasons = [raw]
+    elif isinstance(raw, list):
+        seasons = raw
+    else:
+        seasons = []
 
-    data["rounds"].append({
-        "round": round_num,
-        "opponent": opponent,
-        "our_stars": our_stars,
-        "their_stars": their_stars,
-        "members": members,
+    # Find existing entry for this season
+    for s in seasons:
+        if s.get("season") == season:
+            s["rounds"].append({
+                "round": round_num,
+                "opponent": opponent,
+                "our_stars": our_stars,
+                "their_stars": their_stars,
+                "members": members,
+            })
+            _save_json(CWL_HISTORY_FILE, seasons[:MAX_CWL_SEASONS])
+            return
+
+    # New season — prepend and trim
+    seasons.insert(0, {
+        "season": season,
+        "rounds": [{
+            "round": round_num,
+            "opponent": opponent,
+            "our_stars": our_stars,
+            "their_stars": their_stars,
+            "members": members,
+        }],
     })
-    _save_json(CWL_HISTORY_FILE, data)
+    _save_json(CWL_HISTORY_FILE, seasons[:MAX_CWL_SEASONS])
+
+
+def get_cwl_seasons() -> list[dict]:
+    """Return list of saved CWL seasons (newest first)."""
+    raw = _load_json(CWL_HISTORY_FILE)
+    if raw is None:
+        return []
+    if isinstance(raw, dict) and "season" in raw:
+        return [raw]  # migrate old single-season format
+    if isinstance(raw, list):
+        return raw
+    return []
 
 
 def get_cwl_history() -> dict:
-    return _load_json(CWL_HISTORY_FILE) or {"season": None, "rounds": []}
+    """Backward-compat: return most recent saved season."""
+    seasons = get_cwl_seasons()
+    return seasons[0] if seasons else {"season": None, "rounds": []}

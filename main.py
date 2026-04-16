@@ -579,77 +579,116 @@ async def testend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⏳ Собираю статистику, подождите...")
     try:
-        # ── 1. КВ: stored history + live current war (if not already saved) ──
-        war_history = stats_storage.get_war_history()
+        clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+
+        # ── Helper: extract player data from a ClanWar object ──────────────────
+        def _war_members(war_obj):
+            our = war_obj.clan
+            if our.tag.lstrip("#").upper() != clan_tag_clean:
+                our = war_obj.opponent
+            members = []
+            for m in (our.members or []):
+                members.append({
+                    "name": m.name,
+                    "th": getattr(m, "town_hall", 0),
+                    "attacks_used": len(m.attacks) if m.attacks else 0,
+                    "attacks_max": war_obj.attacks_per_member,
+                })
+            return members
+
+        def _war_result(war_obj):
+            our = war_obj.clan
+            opp = war_obj.opponent
+            if our.tag.lstrip("#").upper() != clan_tag_clean:
+                our, opp = opp, our
+            if war_obj.state != "warEnded":
+                return "—"
+            if our.stars > opp.stars:
+                return "win"
+            elif our.stars < opp.stars:
+                return "lose"
+            elif (our.destruction or 0) > (opp.destruction or 0):
+                return "win"
+            elif (our.destruction or 0) < (opp.destruction or 0):
+                return "lose"
+            return "tie"
+
+        # ── 1. КВ: war log (5 regular wars) + live player data overlay ─────────
+        # Build player data index from saved history (key = end_time[:16])
+        saved_wars = stats_storage.get_war_history()
+        player_data_by_time: dict[str, list] = {}
+        for sw in saved_wars:
+            key = sw.get("end_time", "")[:16]
+            if key and sw.get("members"):
+                player_data_by_time[key] = sw["members"]
+
+        # Fetch current war for live player data
         try:
             cw = await coc_client.get_current_war(CLAN_TAG)
             if cw and cw.state in ("inWar", "warEnded"):
-                war_end_iso = cw.end_time.time.isoformat() if cw.end_time else ""
-                already_saved = any(
-                    w.get("end_time", "")[:16] == war_end_iso[:16]
-                    for w in war_history
-                )
-                if not already_saved:
-                    our = cw.clan
-                    opp = cw.opponent
-                    result = "—"
-                    if cw.state == "warEnded":
-                        if our.stars > opp.stars:
-                            result = "win"
-                        elif our.stars < opp.stars:
-                            result = "lose"
-                        elif (our.destruction or 0) > (opp.destruction or 0):
-                            result = "win"
-                        elif (our.destruction or 0) < (opp.destruction or 0):
-                            result = "lose"
-                        else:
-                            result = "tie"
-                    members = []
-                    for m in (our.members or []):
-                        members.append({
-                            "name": m.name,
-                            "th": getattr(m, "town_hall", 0),
-                            "attacks_used": len(m.attacks) if m.attacks else 0,
-                            "attacks_max": cw.attacks_per_member,
-                        })
-                    war_history = [{
-                        "end_time": war_end_iso,
-                        "opponent": opp.name,
-                        "result": result,
-                        "our_stars": our.stars,
-                        "their_stars": opp.stars,
-                        "team_size": cw.team_size,
-                        "attacks_per_member": cw.attacks_per_member,
-                        "members": members,
-                    }] + war_history
+                cw_end = cw.end_time.time.isoformat() if cw.end_time else ""
+                if cw_end:
+                    player_data_by_time[cw_end[:16]] = _war_members(cw)
         except Exception as e:
-            logger.warning(f"Не удалось загрузить текущую КВ: {e}")
+            logger.warning(f"Текущая КВ: {e}")
+            cw = None
 
-        # ── 2. ЛВК: all completed rounds in current season (live from API) ──
-        cwl_data = {"season": None, "rounds": []}
+        # Fetch war log for the last 5 regular wars (summaries)
+        war_history: list[dict] = []
+        try:
+            async for entry in await coc_client.get_war_log(CLAN_TAG, limit=10):
+                # Skip CWL entries (opponent is None)
+                if entry.opponent is None:
+                    continue
+                end_iso = entry.end_time.time.isoformat() if entry.end_time else ""
+                result_str = "—"
+                try:
+                    result_str = entry.result.value if hasattr(entry.result, "value") else str(entry.result).lower()
+                except Exception:
+                    pass
+                key = end_iso[:16]
+                members = player_data_by_time.get(key, [])
+                our_stars = entry.clan.stars if entry.clan else 0
+                their_stars = entry.opponent.stars if entry.opponent else 0
+                war_history.append({
+                    "end_time": end_iso,
+                    "opponent": entry.opponent.name if entry.opponent else "—",
+                    "result": result_str,
+                    "our_stars": our_stars,
+                    "their_stars": their_stars,
+                    "team_size": entry.team_size or 0,
+                    "attacks_per_member": entry.attacks_per_member or 2,
+                    "members": members,
+                })
+                if len(war_history) >= 5:
+                    break
+        except Exception as e:
+            logger.warning(f"War log error: {e}")
+            # Fall back to saved history if war log fails
+            war_history = saved_wars[:5]
+
+        # If war log returned nothing, fall back to saved + current war
+        if not war_history:
+            war_history = saved_wars[:5]
+
+        # ── 2. ЛВК: current season (live API) + previous seasons (saved) ───────
+        cwl_seasons: list[dict] = []
+
+        # Live current season
+        live_season = None
         try:
             group = await coc_client.get_league_group(CLAN_TAG)
-            cwl_data["season"] = group.season
-            clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+            live_season = group.season
             live_rounds = []
             round_num = 0
             async for war in group.get_wars_for_clan(CLAN_TAG):
                 round_num += 1
                 if war.state == "notInWar":
                     continue
-                # Determine which side is ours
-                if war.clan.tag.lstrip("#").upper() == clan_tag_clean:
-                    our_side = war.clan
-                    opp_side = war.opponent
-                else:
-                    our_side = war.opponent
-                    opp_side = war.clan
-                members = []
-                for m in (our_side.members or []):
-                    members.append({
-                        "name": m.name,
-                        "attacked": bool(m.attacks),
-                    })
+                our_side = war.clan if war.clan.tag.lstrip("#").upper() == clan_tag_clean else war.opponent
+                opp_side = war.opponent if our_side is war.clan else war.clan
+                members = [{"name": m.name, "attacked": bool(m.attacks)}
+                           for m in (our_side.members or [])]
                 live_rounds.append({
                     "round": round_num,
                     "opponent": opp_side.name,
@@ -659,35 +698,43 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "members": members,
                 })
             if live_rounds:
-                cwl_data["rounds"] = sorted(live_rounds, key=lambda r: r["round"])
-            else:
-                cwl_data = stats_storage.get_cwl_history()
+                cwl_seasons.append({
+                    "season": live_season,
+                    "rounds": sorted(live_rounds, key=lambda r: r["round"]),
+                })
         except coc.NotFound:
-            cwl_data = stats_storage.get_cwl_history()
+            pass
         except Exception as e:
-            logger.warning(f"Не удалось загрузить ЛВК: {e}")
-            cwl_data = stats_storage.get_cwl_history()
+            logger.warning(f"ЛВК live error: {e}")
 
-        # ── 3. Рейды столицы: последние 2 (live API) ──
+        # Saved seasons (include any season != current live season)
+        for saved_s in stats_storage.get_cwl_seasons():
+            if saved_s.get("season") != live_season and saved_s.get("rounds"):
+                cwl_seasons.append(saved_s)
+
+        # If nothing live, try all saved
+        if not cwl_seasons:
+            cwl_seasons = stats_storage.get_cwl_seasons()
+
+        # ── 3. Рейды столицы: только последний рейд ────────────────────────────
         raids = []
         try:
-            raid_log = await coc_client.get_raid_log(CLAN_TAG, limit=2)
+            raid_log = await coc_client.get_raid_log(CLAN_TAG, limit=1)
             async for entry in raid_log:
                 raids.append(entry)
         except Exception as e:
-            logger.warning(f"Не удалось загрузить рейды: {e}")
+            logger.warning(f"Рейды: {e}")
 
-        buf = excel_builder.build_excel(war_history[:5], cwl_data, raids)
-        n_kv = min(len(war_history), 5)
-        n_cwl = len(cwl_data.get("rounds", []))
+        buf = excel_builder.build_excel(war_history, cwl_seasons, raids)
+        n_cwl_rounds = sum(len(s.get("rounds", [])) for s in cwl_seasons)
         await update.message.reply_document(
             document=buf,
             filename="warfil_statistics.xlsx",
             caption=(
                 "📊 <b>Статистика клана Warfil</b>\n\n"
-                f"⚔️ КВ — {n_kv} войн\n"
-                f"🏆 ЛВК — {n_cwl} раундов\n"
-                f"🏛 Рейды — последние {len(raids)}"
+                f"⚔️ КВ — {len(war_history)} войн\n"
+                f"🏆 ЛВК — {len(cwl_seasons)} сезон(а), {n_cwl_rounds} раундов\n"
+                f"🏛 Рейды — последний рейд"
             ),
             parse_mode="HTML",
         )
