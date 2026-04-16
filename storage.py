@@ -152,3 +152,23 @@ def get_war_state() -> str | None:
             return json.load(f).get("state")
     except (json.JSONDecodeError, KeyError):
         return None
+
+
+# ── CWL state persistence ─────────────────────────────────────────────────────
+
+CWL_STATE_FILE = "cwl_state.json"
+
+
+def save_cwl_state(state: str, round_count: int):
+    with open(CWL_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"state": state, "round_count": round_count}, f)
+
+
+def get_cwl_state() -> dict | None:
+    if not os.path.exists(CWL_STATE_FILE):
+        return None
+    try:
+        with open(CWL_STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, KeyError):
+        return None

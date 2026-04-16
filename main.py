@@ -560,19 +560,242 @@ async def testend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
+async def get_cwl_clan_war(war_round=coc.WarRound.current_war):
+    """Return (war, group, round_num) for our clan in the requested CWL round, or (None, group, 0)."""
+    try:
+        group = await coc_client.get_league_group(CLAN_TAG)
+    except (coc.NotFound, Exception):
+        return None, None, 0
+
+    round_num = len(group.rounds)
+    try:
+        async for war in group.get_wars(war_round):
+            clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+            if (war.clan.tag.lstrip("#").upper() == clan_tag_clean
+                    or war.opponent.tag.lstrip("#").upper() == clan_tag_clean):
+                return war, group, round_num
+    except Exception:
+        pass
+    return None, group, round_num
+
+
+async def build_cwl_message() -> tuple[str, bool]:
+    """Build CWL status message. Returns (text, keep_updating)."""
+    war, group, round_num = await get_cwl_clan_war()
+
+    if group is None:
+        return "🏳️ Клан не участвует в Лиге войн клана.", False
+
+    if war is None or group.state == "preparation":
+        return f"⚙️ ЛВК — идёт подготовка. Раундов сыграно: {round_num}.", False
+
+    if group.state == "ended":
+        return "🏁 Сезон Лиги войн клана завершён.", False
+
+    clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+    our_side = war.clan if war.clan.tag.lstrip("#").upper() == clan_tag_clean else war.opponent
+    opp_side = war.opponent if our_side is war.clan else war.clan
+
+    attacks_per_member = 1
+    pending = []
+    for member in our_side.members:
+        used = len(member.attacks) if member.attacks else 0
+        if used < attacks_per_member:
+            pending.append(member)
+
+    state_label = "⚔️ ЛВК идёт" if group.state == "inWar" else "🏁 ЛВК раунд завершён"
+    our_stars = our_side.stars
+    their_stars = opp_side.stars
+
+    time_str = ""
+    if group.state == "inWar" and war.end_time:
+        now = datetime.utcnow()
+        diff = war.end_time.time - now
+        total_sec = max(int(diff.total_seconds()), 0)
+        h, m = divmod(total_sec // 60, 60)
+        time_str = f"\n⏱ До конца раунда: <b>{h}ч {m}мин</b>"
+
+    lines = [
+        f"<b>{state_label} — Раунд {round_num}</b>",
+        f"🏰 <b>{our_side.name}</b>  ⚔️  <b>{opp_side.name}</b>",
+        f"⭐ {our_stars}  vs  {their_stars} ⭐" + time_str,
+    ]
+
+    if not pending:
+        lines.append("\n✅ <b>Все атаковали в этом раунде!</b>")
+    else:
+        lines.append(f"\n⏳ <b>Не атаковали — {len(pending)} чел.</b>")
+        tg_map = storage.get_tg_username_map()
+        for member in pending:
+            tg = tg_map.get(member.name.lower())
+            tg_str = f"  <i>@{tg}</i>" if tg else ""
+            lines.append(f"  🔴 {member.name}{tg_str}")
+
+    keep_updating = group.state == "inWar"
+    return "\n".join(lines), keep_updating
+
+
+async def send_cwl_start(bot, chat_id: int, war, group, round_num: int):
+    clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+    our_side = war.clan if war.clan.tag.lstrip("#").upper() == clan_tag_clean else war.opponent
+    opp_side = war.opponent if our_side is war.clan else war.clan
+    opponent_name = opp_side.name if opp_side else "противника"
+
+    text = (
+        f"🏆⚔️ <b>ЛВК — РАУНД {round_num} НАЧАЛСЯ!</b> ⚔️🏆\n\n"
+        f"🏰 <b>Warfil</b>  vs  <b>{opponent_name}</b>\n\n"
+        "💥 Помните — в ЛВК только <b>1 атака</b> на игрока!\n\n"
+        "🎯 Атакуйте с умом, выбирайте цели тщательно!\n"
+        "🏆 Желаем красивых атак и звёздных результатов!\n\n"
+        "<b>Покажем им силу клана Warfil!</b> 💪"
+    )
+    await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=KV_BUTTONS)
+
+
+async def send_cwl_end(bot, chat_id: int, war, round_num: int):
+    clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+    our_side = war.clan if war.clan.tag.lstrip("#").upper() == clan_tag_clean else war.opponent
+    opp_side = war.opponent if our_side is war.clan else war.clan
+    tg_map = storage.get_tg_username_map()
+
+    attacked = []
+    missed = []
+    for member in our_side.members:
+        used = len(member.attacks) if member.attacks else 0
+        if used >= 1:
+            attacked.append(member)
+        else:
+            missed.append(member)
+
+    our_stars = our_side.stars
+    their_stars = opp_side.stars
+    if our_stars > their_stars:
+        result_line = "🏆 <b>Победа в раунде!</b>"
+    elif our_stars < their_stars:
+        result_line = "😔 <b>Поражение в раунде.</b>"
+    else:
+        result_line = "🤝 <b>Ничья в раунде.</b>"
+
+    lines = [
+        f"🏁 <b>ЛВК — РАУНД {round_num} ЗАВЕРШЁН!</b>\n",
+        f"🏰 <b>Warfil</b>  vs  <b>{opp_side.name}</b>",
+        f"⭐ {our_stars}  vs  {their_stars} ⭐  —  {result_line}",
+    ]
+
+    if attacked:
+        lines.append(f"\n✅ <b>Атаковали ({len(attacked)}):</b>")
+        for member in attacked:
+            tg = tg_map.get(member.name.lower())
+            tg_str = f"  <i>@{tg}</i>" if tg else ""
+            lines.append(f"  • {member.name}{tg_str}")
+        lines.append("\n🔥 Молодцы! Продолжайте в том же духе! 💪")
+
+    if missed:
+        lines.append(f"\n❌ <b>Не атаковали в раунде ({len(missed)}):</b>")
+        for member in missed:
+            tg = tg_map.get(member.name.lower())
+            tg_str = f"  <i>@{tg}</i>" if tg else ""
+            lines.append(f"  • {member.name}{tg_str}")
+        lines.append("\n⚠️ <b>Данные игроки попадают в номинацию на кик из клана!</b>")
+
+    await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="HTML", reply_markup=KV_BUTTONS)
+
+
+async def cwl_state_monitor(bot):
+    """Poll CWL state every 60s; send messages on round start/end transitions."""
+    saved = storage.get_cwl_state()
+    prev_state = saved.get("state") if saved else None
+    prev_round = saved.get("round_count", 0) if saved else 0
+
+    while True:
+        await asyncio.sleep(60)
+        try:
+            chat_id = storage.get_notify_chat()
+            if not chat_id:
+                continue
+
+            group = await coc_client.get_league_group(CLAN_TAG)
+            current_state = group.state
+            current_round = len(group.rounds)
+
+            # New round started (inWar AND round count increased)
+            if current_state == "inWar" and (prev_state != "inWar" or current_round != prev_round):
+                war, _, _ = await get_cwl_clan_war()
+                if war:
+                    await send_cwl_start(bot, chat_id, war, group, current_round)
+
+            # Round ended
+            elif current_state == "warEnded" and prev_state == "inWar":
+                war, _, _ = await get_cwl_clan_war(coc.WarRound.previous_war)
+                if war:
+                    await send_cwl_end(bot, chat_id, war, prev_round)
+
+            if current_state != prev_state or current_round != prev_round:
+                storage.save_cwl_state(current_state, current_round)
+                prev_state = current_state
+                prev_round = current_round
+
+        except coc.NotFound:
+            pass  # Clan not in CWL this season
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"cwl_state_monitor: {e}")
+
+
+async def cwl_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("⏳ Загружаю данные Лиги войн...")
+    try:
+        text, _ = await build_cwl_message()
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=KV_BUTTONS)
+    except Exception as e:
+        logger.error(f"Ошибка /cwl: {e}")
+        await msg.edit_text("❌ Не удалось загрузить данные ЛВК. Попробуй позже.")
+
+
+async def testcwlstart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("❌ Нет доступа.")
+        return
+    try:
+        war, group, round_num = await get_cwl_clan_war()
+        if war is None:
+            await update.message.reply_text("⚠️ Клан не в ЛВК или нет активного раунда.")
+            return
+        await send_cwl_start(context.bot, update.effective_chat.id, war, group, round_num)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+async def testcwlend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("❌ Нет доступа.")
+        return
+    try:
+        war, group, round_num = await get_cwl_clan_war()
+        if war is None:
+            await update.message.reply_text("⚠️ Клан не в ЛВК или нет активного раунда.")
+            return
+        await send_cwl_end(context.bot, update.effective_chat.id, war, round_num)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
 async def post_init(application):
     await coc_client.login(COC_EMAIL, COC_PASSWORD)
     logger.info("CoC клиент авторизован")
 
     asyncio.create_task(war_auto_broadcast(application.bot))
     asyncio.create_task(war_state_monitor(application.bot))
-    logger.info("Авто-рассылка войны запущена")
+    asyncio.create_task(cwl_state_monitor(application.bot))
+    logger.info("Авто-рассылка войны и ЛВК запущена")
 
     # Register bot commands (shown in Telegram command menu)
     await application.bot.set_my_commands([
         BotCommand("start",    "🏰 Главное меню"),
         BotCommand("team",     "📋 Список участников клана"),
         BotCommand("kv",       "⚔️ Атаки в клановой войне"),
+        BotCommand("cwl",      "🏆 Статус Лиги войн клана"),
         BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
         BotCommand("help",     "❓ Помощь по командам"),
         BotCommand("link",     "🛡 [Адм] Привязать игрока к Telegram"),
@@ -607,6 +830,9 @@ def main():
     app.add_handler(CommandHandler("links", links_command))
     app.add_handler(CommandHandler("teststart", teststart_command))
     app.add_handler(CommandHandler("testend", testend_command))
+    app.add_handler(CommandHandler("cwl", cwl_command))
+    app.add_handler(CommandHandler("testcwlstart", testcwlstart_command))
+    app.add_handler(CommandHandler("testcwlend", testcwlend_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logger.info("Бот запущен...")
