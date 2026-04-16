@@ -528,6 +528,39 @@ async def war_auto_broadcast(bot):
         await asyncio.sleep(7200)  # 2 часа
 
 
+def _is_feolar(update: Update) -> bool:
+    user = update.effective_user
+    return user is not None and (user.username or "").lower() == WAR_NOTIFY_USERNAME.lower()
+
+
+async def teststart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("❌ Нет доступа.")
+        return
+    try:
+        war = await coc_client.get_current_war(CLAN_TAG)
+        if war is None or war.state == "notInWar":
+            await update.message.reply_text("⚠️ Клан не в войне — нет данных для теста.")
+            return
+        await send_war_start(context.bot, update.effective_chat.id, war)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+async def testend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("❌ Нет доступа.")
+        return
+    try:
+        war = await coc_client.get_current_war(CLAN_TAG)
+        if war is None or war.state == "notInWar":
+            await update.message.reply_text("⚠️ Клан не в войне — нет данных для теста.")
+            return
+        await send_war_end(context.bot, update.effective_chat.id, war)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
 async def post_init(application):
     await coc_client.login(COC_EMAIL, COC_PASSWORD)
     logger.info("CoC клиент авторизован")
@@ -573,6 +606,8 @@ def main():
     app.add_handler(CommandHandler("link", link_command))
     app.add_handler(CommandHandler("unlink", unlink_command))
     app.add_handler(CommandHandler("links", links_command))
+    app.add_handler(CommandHandler("teststart", teststart_command))
+    app.add_handler(CommandHandler("testend", testend_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logger.info("Бот запущен...")
