@@ -8,4 +8,5 @@ dependencies = [
     "coc-py>=4.0.0",
     "pillow>=12.2.0",
     "python-telegram-bot>=22.7",
+    "openpyxl>=3.1.0",
 ]

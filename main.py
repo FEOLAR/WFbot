@@ -10,6 +10,8 @@ from telegram import (
 )
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import storage
+import stats_storage
+import excel_builder
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -471,6 +473,20 @@ async def send_war_end(bot, chat_id: int, war):
             lines.append(f"  • {member.name}{tg_str}{used_str}")
         lines.append("\n⚠️ <b>Данные игроки попадают в номинацию на кик из клана!</b>")
 
+    # Save stats for Excel
+    result_str = "win" if our_stars > their_stars else ("lose" if our_stars < their_stars else "tie")
+    end_str = war.end_time.time.strftime("%Y-%m-%dT%H:%M:%S") if war.end_time else ""
+    member_stats = []
+    for member in war.clan.members:
+        used = len(member.attacks) if member.attacks else 0
+        member_stats.append({"name": member.name, "attacks_used": used, "attacks_max": attacks_per_member})
+    stats_storage.save_war_result(
+        end_time=end_str, opponent=war.opponent.name,
+        result=result_str, our_stars=our_stars, their_stars=their_stars,
+        team_size=war.team_size, attacks_per_member=attacks_per_member,
+        members=member_stats,
+    )
+
     await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="HTML", reply_markup=KV_BUTTONS)
 
 
@@ -558,6 +574,38 @@ async def testend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_war_end(context.bot, update.effective_chat.id, war)
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("⏳ Собираю статистику, подождите...")
+    try:
+        war_history = stats_storage.get_war_history()
+        cwl_history = stats_storage.get_cwl_history()
+
+        # Fetch last 2 raids live from API
+        raids = []
+        try:
+            async for entry in await coc_client.get_raid_log(CLAN_TAG, limit=2):
+                raids.append(entry)
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить рейды: {e}")
+
+        buf = excel_builder.build_excel(war_history, cwl_history, raids)
+        await update.message.reply_document(
+            document=buf,
+            filename="warfil_statistics.xlsx",
+            caption=(
+                "📊 <b>Статистика клана Warfil</b>\n\n"
+                f"⚔️ КВ — данные за {len(war_history)} войн\n"
+                f"🏆 ЛВК — {len(cwl_history.get('rounds', []))} раундов\n"
+                f"🏛 Рейды — последние {len(raids)} рейда"
+            ),
+            parse_mode="HTML",
+        )
+        await msg.delete()
+    except Exception as e:
+        logger.error(f"Ошибка /statistic: {e}")
+        await msg.edit_text("❌ Не удалось сгенерировать файл. Попробуй позже.")
 
 
 async def get_cwl_clan_war(war_round=coc.WarRound.current_war):
@@ -698,6 +746,25 @@ async def send_cwl_end(bot, chat_id: int, war, round_num: int):
             lines.append(f"  • {member.name}{tg_str}")
         lines.append("\n⚠️ <b>Данные игроки попадают в номинацию на кик из клана!</b>")
 
+    # Save CWL round stats for Excel
+    # Determine current season from CWL group if possible (use YYYY-MM format)
+    try:
+        group = await coc_client.get_league_group(CLAN_TAG)
+        season = group.season or "unknown"
+    except Exception:
+        season = "unknown"
+    member_stats = []
+    for m in attacked:
+        member_stats.append({"name": m.name, "attacked": True})
+    for m in missed:
+        member_stats.append({"name": m.name, "attacked": False})
+    stats_storage.save_cwl_round(
+        season=season, round_num=round_num,
+        opponent=opp_side.name,
+        our_stars=our_stars, their_stars=their_stars,
+        members=member_stats,
+    )
+
     await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="HTML", reply_markup=KV_BUTTONS)
 
 
@@ -796,6 +863,7 @@ async def post_init(application):
         BotCommand("team",     "📋 Список участников клана"),
         BotCommand("kv",       "⚔️ Атаки в клановой войне"),
         BotCommand("cwl",      "🏆 Статус Лиги войн клана"),
+        BotCommand("statistic","📊 Статистика клана (Excel)"),
         BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
         BotCommand("help",     "❓ Помощь по командам"),
         BotCommand("link",     "🛡 [Адм] Привязать игрока к Telegram"),
@@ -831,6 +899,7 @@ def main():
     app.add_handler(CommandHandler("teststart", teststart_command))
     app.add_handler(CommandHandler("testend", testend_command))
     app.add_handler(CommandHandler("cwl", cwl_command))
+    app.add_handler(CommandHandler("statistic", statistic_command))
     app.add_handler(CommandHandler("testcwlstart", testcwlstart_command))
     app.add_handler(CommandHandler("testcwlend", testcwlend_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
