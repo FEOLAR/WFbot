@@ -23,6 +23,7 @@ COC_PASSWORD = os.environ["COC_PASSWORD"]
 CLAN_TAG       = "#2R02GGRUJ"
 CLAN_WEBSITE   = "https://www.warfilcoc.ru"
 TG_GROUP_LINK  = "https://t.me/warfil_clan"   # ← замени на реальную ссылку беседы
+WAR_NOTIFY_USERNAME = "feolar"                 # username получателя авто-рассылки войны
 
 ROLE_ORDER = {
     "leader": 0,
@@ -135,6 +136,13 @@ def format_last_seen(last_seen_str: str | None) -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     name = user.first_name or "боец"
+
+    # Save chat_id for the war broadcast target when they DM the bot
+    if (update.effective_chat.type == "private"
+            and user.username
+            and user.username.lower() == WAR_NOTIFY_USERNAME.lower()):
+        storage.save_notify_chat(update.effective_chat.id)
+        logger.info(f"Saved war notify chat_id: {update.effective_chat.id}")
 
     text = (
         f"👋 Привет, <b>{name}</b>!\n\n"
@@ -405,9 +413,35 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass  # ignore other text messages
 
 
+async def war_auto_broadcast(bot):
+    """Send a new war status message every 5 seconds while war is active."""
+    while True:
+        try:
+            chat_id = storage.get_notify_chat()
+            if chat_id:
+                text, keep_going = await build_war_message()
+                if keep_going:
+                    await bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        parse_mode="HTML",
+                        reply_markup=KV_BUTTONS,
+                    )
+            else:
+                logger.debug("war_auto_broadcast: chat_id not set yet, waiting...")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"war_auto_broadcast: {e}")
+        await asyncio.sleep(5)
+
+
 async def post_init(application):
     await coc_client.login(COC_EMAIL, COC_PASSWORD)
     logger.info("CoC клиент авторизован")
+
+    asyncio.create_task(war_auto_broadcast(application.bot))
+    logger.info("Авто-рассылка войны запущена")
 
     # Register bot commands (shown in Telegram command menu)
     await application.bot.set_my_commands([

@@ -2,8 +2,9 @@ import json
 import os
 from datetime import datetime
 
-DATA_FILE  = "players.json"
-LINKS_FILE = "links.json"
+DATA_FILE        = "players.json"
+LINKS_FILE       = "links.json"
+NOTIFY_CHAT_FILE = "notify_chat.json"
 
 
 # ── Internal helpers ────────────────────────────────────────────────────────
@@ -116,3 +117,18 @@ def get_tg_username_map() -> dict[str, str]:
     # Admin links override / supplement
     result.update(_load_links())
     return result
+
+
+# ── War notification chat ─────────────────────────────────────────────────────
+
+def save_notify_chat(chat_id: int):
+    with open(NOTIFY_CHAT_FILE, "w", encoding="utf-8") as f:
+        json.dump({"chat_id": chat_id}, f)
+
+
+def get_notify_chat() -> int | None:
+    if not os.path.exists(NOTIFY_CHAT_FILE):
+        return None
+    with open(NOTIFY_CHAT_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("chat_id")
