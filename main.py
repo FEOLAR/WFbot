@@ -502,7 +502,7 @@ async def war_state_monitor(bot):
                 continue
 
             war = await coc_client.get_current_war(CLAN_TAG)
-            current_state = war.state if war else "notInWar"
+            current_state = war.state.value if war and war.state else "notInWar"
 
             if previous_state is not None and previous_state != current_state:
                 if previous_state == "preparation" and current_state == "inWar":
@@ -579,32 +579,121 @@ async def testend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⏳ Собираю статистику, подождите...")
     try:
+        # ── 1. КВ: stored history + live current war (if not already saved) ──
         war_history = stats_storage.get_war_history()
-        cwl_history = stats_storage.get_cwl_history()
+        try:
+            cw = await coc_client.get_current_war(CLAN_TAG)
+            if cw and cw.state in ("inWar", "warEnded"):
+                war_end_iso = cw.end_time.time.isoformat() if cw.end_time else ""
+                already_saved = any(
+                    w.get("end_time", "")[:16] == war_end_iso[:16]
+                    for w in war_history
+                )
+                if not already_saved:
+                    our = cw.clan
+                    opp = cw.opponent
+                    result = "—"
+                    if cw.state == "warEnded":
+                        if our.stars > opp.stars:
+                            result = "win"
+                        elif our.stars < opp.stars:
+                            result = "lose"
+                        elif (our.destruction or 0) > (opp.destruction or 0):
+                            result = "win"
+                        elif (our.destruction or 0) < (opp.destruction or 0):
+                            result = "lose"
+                        else:
+                            result = "tie"
+                    members = []
+                    for m in (our.members or []):
+                        members.append({
+                            "name": m.name,
+                            "th": getattr(m, "town_hall", 0),
+                            "attacks_used": len(m.attacks) if m.attacks else 0,
+                            "attacks_max": cw.attacks_per_member,
+                        })
+                    war_history = [{
+                        "end_time": war_end_iso,
+                        "opponent": opp.name,
+                        "result": result,
+                        "our_stars": our.stars,
+                        "their_stars": opp.stars,
+                        "team_size": cw.team_size,
+                        "attacks_per_member": cw.attacks_per_member,
+                        "members": members,
+                    }] + war_history
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить текущую КВ: {e}")
 
-        # Fetch last 2 raids live from API
+        # ── 2. ЛВК: all completed rounds in current season (live from API) ──
+        cwl_data = {"season": None, "rounds": []}
+        try:
+            group = await coc_client.get_league_group(CLAN_TAG)
+            cwl_data["season"] = group.season
+            clan_tag_clean = CLAN_TAG.lstrip("#").upper()
+            live_rounds = []
+            round_num = 0
+            async for war in group.get_wars_for_clan(CLAN_TAG):
+                round_num += 1
+                if war.state == "notInWar":
+                    continue
+                # Determine which side is ours
+                if war.clan.tag.lstrip("#").upper() == clan_tag_clean:
+                    our_side = war.clan
+                    opp_side = war.opponent
+                else:
+                    our_side = war.opponent
+                    opp_side = war.clan
+                members = []
+                for m in (our_side.members or []):
+                    members.append({
+                        "name": m.name,
+                        "attacked": bool(m.attacks),
+                    })
+                live_rounds.append({
+                    "round": round_num,
+                    "opponent": opp_side.name,
+                    "our_stars": our_side.stars,
+                    "their_stars": opp_side.stars,
+                    "state": war.state.value if hasattr(war.state, "value") else str(war.state),
+                    "members": members,
+                })
+            if live_rounds:
+                cwl_data["rounds"] = sorted(live_rounds, key=lambda r: r["round"])
+            else:
+                cwl_data = stats_storage.get_cwl_history()
+        except coc.NotFound:
+            cwl_data = stats_storage.get_cwl_history()
+        except Exception as e:
+            logger.warning(f"Не удалось загрузить ЛВК: {e}")
+            cwl_data = stats_storage.get_cwl_history()
+
+        # ── 3. Рейды столицы: последние 2 (live API) ──
         raids = []
         try:
-            async for entry in await coc_client.get_raid_log(CLAN_TAG, limit=2):
+            raid_log = await coc_client.get_raid_log(CLAN_TAG, limit=2)
+            async for entry in raid_log:
                 raids.append(entry)
         except Exception as e:
             logger.warning(f"Не удалось загрузить рейды: {e}")
 
-        buf = excel_builder.build_excel(war_history, cwl_history, raids)
+        buf = excel_builder.build_excel(war_history[:5], cwl_data, raids)
+        n_kv = min(len(war_history), 5)
+        n_cwl = len(cwl_data.get("rounds", []))
         await update.message.reply_document(
             document=buf,
             filename="warfil_statistics.xlsx",
             caption=(
                 "📊 <b>Статистика клана Warfil</b>\n\n"
-                f"⚔️ КВ — данные за {len(war_history)} войн\n"
-                f"🏆 ЛВК — {len(cwl_history.get('rounds', []))} раундов\n"
-                f"🏛 Рейды — последние {len(raids)} рейда"
+                f"⚔️ КВ — {n_kv} войн\n"
+                f"🏆 ЛВК — {n_cwl} раундов\n"
+                f"🏛 Рейды — последние {len(raids)}"
             ),
             parse_mode="HTML",
         )
         await msg.delete()
     except Exception as e:
-        logger.error(f"Ошибка /statistic: {e}")
+        logger.error(f"Ошибка /statistic: {e}", exc_info=True)
         await msg.edit_text("❌ Не удалось сгенерировать файл. Попробуй позже.")
 
 
@@ -782,7 +871,7 @@ async def cwl_state_monitor(bot):
                 continue
 
             group = await coc_client.get_league_group(CLAN_TAG)
-            current_state = group.state
+            current_state = group.state or "notInWar"
             current_round = len(group.rounds)
 
             # New round started (inWar AND round count increased)
