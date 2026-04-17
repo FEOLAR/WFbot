@@ -1102,14 +1102,7 @@ async def post_shutdown(application):
 async def conflict_error_handler(update, context):
     from telegram.error import Conflict
     if isinstance(context.error, Conflict):
-        if not IS_PRODUCTION:
-            logger.warning(
-                "⚠️ Конфликт: задеплоенный бот уже запущен. "
-                "Dev-режим останавливается, чтобы не мешать рабочему боту."
-            )
-            os._exit(0)
-        else:
-            logger.warning("Conflict в production — ожидаю освобождения...")
+        logger.warning("Конфликт: другой экземпляр бота работает. Жду освобождения...")
     else:
         logger.error(f"Ошибка: {context.error}")
 
