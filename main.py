@@ -21,6 +21,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+IS_PRODUCTION = os.environ.get("REPLIT_DEPLOYMENT") == "1"
+
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 COC_EMAIL = os.environ["COC_EMAIL"]
 COC_PASSWORD = os.environ["COC_PASSWORD"]
@@ -1097,6 +1099,21 @@ async def post_shutdown(application):
     await coc_client.close()
 
 
+async def conflict_error_handler(update, context):
+    from telegram.error import Conflict
+    if isinstance(context.error, Conflict):
+        if not IS_PRODUCTION:
+            logger.warning(
+                "⚠️ Конфликт: задеплоенный бот уже запущен. "
+                "Dev-режим останавливается, чтобы не мешать рабочему боту."
+            )
+            os._exit(0)
+        else:
+            logger.warning("Conflict в production — ожидаю освобождения...")
+    else:
+        logger.error(f"Ошибка: {context.error}")
+
+
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -1141,6 +1158,7 @@ def main():
     app.add_handler(CommandHandler("testcwlstart", testcwlstart_command))
     app.add_handler(CommandHandler("testcwlend", testcwlend_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    app.add_error_handler(conflict_error_handler)
 
     logger.info("Бот запущен...")
     app.run_polling()
