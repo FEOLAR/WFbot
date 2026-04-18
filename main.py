@@ -679,46 +679,13 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ── Fetch clan member list (always available, used as player row fallback) ──
         clan_members: list[dict] = []
-        clan_member_tags: list[tuple] = []  # (tag, name, th)
         try:
             clan = await coc_client.get_clan(CLAN_TAG)
             for m in (clan.members or []):
-                th = getattr(m, "town_hall", 0)
-                clan_members.append({"name": m.name, "th": th})
-                clan_member_tags.append((m.tag, m.name, th))
+                clan_members.append({"name": m.name, "th": getattr(m, "town_hall", 0)})
         except Exception as e:
             logger.warning(f"Clan members: {e}")
 
-        # ── Fetch league stats for each member (attack_wins / defense_wins) ──────
-        league_data: list[dict] = []
-        try:
-            async def _fetch_player_league(tag, name, th):
-                try:
-                    p = await coc_client.get_player(tag)
-                    league_name = "Unranked"
-                    if p.league and hasattr(p.league, "name"):
-                        league_name = p.league.name
-                    elif p.league:
-                        league_name = str(p.league)
-                    return {
-                        "name": name,
-                        "th": th,
-                        "league": league_name,
-                        "trophies": p.trophies or 0,
-                        "attack_wins": p.attack_wins or 0,
-                        "defense_wins": p.defense_wins or 0,
-                    }
-                except Exception:
-                    return {
-                        "name": name, "th": th, "league": "Unranked",
-                        "trophies": 0, "attack_wins": 0, "defense_wins": 0,
-                    }
-
-            league_data = list(await asyncio.gather(
-                *[_fetch_player_league(tag, name, th) for tag, name, th in clan_member_tags]
-            ))
-        except Exception as e:
-            logger.warning(f"League data error: {e}")
 
         # ── 1. КВ: war log (5 regular wars) + live player data overlay ─────────
         # Index from saved history: (end_time[:16], opponent_name) → members
@@ -847,7 +814,6 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buf = excel_builder.build_excel(
             war_history, cwl_seasons, raids,
             clan_members=clan_members,
-            league_data=league_data,
         )
         n_cwl_rounds = sum(len(s.get("rounds", [])) for s in cwl_seasons)
         await update.message.reply_document(
@@ -857,8 +823,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "📊 <b>Статистика клана Warfil</b>\n\n"
                 f"⚔️ КВ — {len(war_history)} войн\n"
                 f"🏆 ЛВК — {len(cwl_seasons)} сезон(а), {n_cwl_rounds} раундов\n"
-                f"🏛 Рейды — последний рейд\n"
-                f"🏅 Лига — {len(league_data)} игроков"
+                f"🏛 Рейды — последний рейд"
             ),
             parse_mode="HTML",
         )
