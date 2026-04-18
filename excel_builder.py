@@ -1,4 +1,5 @@
 import io
+import re
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -310,12 +311,99 @@ def build_raids_sheet(ws, raids: list):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Sheet 4: Лига (current season multiplayer league stats)
+# ─────────────────────────────────────────────────────────────────────────────
+
+LEAGUE_COLORS = {
+    "Legend":       "FFFFE066",
+    "Titan":        "FFE0E0E0",
+    "Champion":     "FFB8CCE4",
+    "Master":       "FFBDD7EE",
+    "Crystal":      "FF92D050",
+    "Gold":         "FFFFC000",
+    "Silver":       "FFD9D9D9",
+    "Bronze":       "FFCE7430",
+    "Dragon":       "FFFF7C80",
+    "Electro":      "FFCFB3FF",
+    "P.E.K.K.A":    "FFD9E1F2",
+    "Golem":        "FFCCCCCC",
+    "Valkyrie":     "FFFCE4D6",
+    "Witch":        "FFE2EFDA",
+    "Barbarian":    "FFFFFF99",
+    "Goblin":       "FFCCFFCC",
+    "Unranked":     "FFF2F2F2",
+}
+
+def _league_bg(league_name: str) -> str:
+    for key, color in LEAGUE_COLORS.items():
+        if key.lower() in league_name.lower():
+            return color
+    return "FFF2F2F2"
+
+
+def build_league_sheet(ws, league_data: list[dict]):
+    ws.title = "Лига"
+
+    total_cols = 7
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
+    _header_cell(ws, 1, 1, "🏅 ЛИГА — текущий сезон (атаки и обороны)", bg=DARK)
+
+    headers = ["#", "Игрок", "TH", "Лига", "Трофеи 🏆", "Побед в атаке ⚔️", "Побед в обороне 🛡"]
+    for col, h in enumerate(headers, 1):
+        _header_cell(ws, 2, col, h, bg=BLUE)
+
+    if not league_data:
+        ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=total_cols)
+        c = ws.cell(row=3, column=1, value="Нет данных")
+        c.alignment = Alignment(horizontal="center")
+        return
+
+    # Sort by trophies descending
+    sorted_data = sorted(league_data, key=lambda p: p.get("trophies", 0), reverse=True)
+
+    for idx, player in enumerate(sorted_data, 1):
+        row = idx + 2
+        league_name = player.get("league", "Unranked")
+        # Strip trailing number from league name (e.g. "Dragon League 30" → "Dragon League")
+        league_clean = re.sub(r'\s+\d+$', '', league_name).strip()
+        bg = _league_bg(league_clean)
+        trophies = player.get("trophies", 0)
+        atk_wins = player.get("attack_wins", 0)
+        def_wins = player.get("defense_wins", 0)
+        th = player.get("th", "—")
+
+        _data_cell(ws, row, 1, idx)
+        _data_cell(ws, row, 2, player.get("name", "—"), align="left")
+        _data_cell(ws, row, 3, th if th else "—")
+        _data_cell(ws, row, 4, league_clean, bg=bg, align="left")
+        _data_cell(ws, row, 5, trophies, bg=bg)
+
+        # attack wins: green if >0, gray if 0
+        atk_bg = GREEN if atk_wins > 0 else GRAY
+        _data_cell(ws, row, 6, atk_wins, bg=atk_bg)
+
+        def_bg = GREEN if def_wins > 0 else GRAY
+        _data_cell(ws, row, 7, def_wins, bg=def_bg)
+
+    ws.column_dimensions["A"].width = 5
+    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["C"].width = 5
+    ws.column_dimensions["D"].width = 20
+    ws.column_dimensions["E"].width = 12
+    ws.column_dimensions["F"].width = 18
+    ws.column_dimensions["G"].width = 18
+    ws.row_dimensions[2].height = 40
+    ws.freeze_panes = "A3"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main entry point
 # cwl_seasons: list of {"season": str, "rounds": [...]} – newest first
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_excel(war_history: list[dict], cwl_seasons: list[dict], raids: list,
-                clan_members: list[dict] = None) -> io.BytesIO:
+                clan_members: list[dict] = None,
+                league_data: list[dict] = None) -> io.BytesIO:
     wb = openpyxl.Workbook()
 
     ws_kv = wb.active
@@ -332,6 +420,9 @@ def build_excel(war_history: list[dict], cwl_seasons: list[dict], raids: list,
 
     ws_raids = wb.create_sheet()
     build_raids_sheet(ws_raids, raids)
+
+    ws_league = wb.create_sheet()
+    build_league_sheet(ws_league, league_data or [])
 
     buf = io.BytesIO()
     wb.save(buf)
