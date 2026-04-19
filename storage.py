@@ -119,19 +119,59 @@ def get_tg_username_map() -> dict[str, str]:
     return result
 
 
-# ── War notification chat ─────────────────────────────────────────────────────
+# ── War notification chats (multiple) ────────────────────────────────────────
+
+def _load_notify_chats() -> list[int]:
+    if not os.path.exists(NOTIFY_CHAT_FILE):
+        return []
+    with open(NOTIFY_CHAT_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    # Backward compat: old format was {"chat_id": 123}
+    if "chat_ids" in data:
+        return data["chat_ids"]
+    if "chat_id" in data and data["chat_id"]:
+        return [data["chat_id"]]
+    return []
+
+
+def _save_notify_chats(chat_ids: list[int]):
+    with open(NOTIFY_CHAT_FILE, "w", encoding="utf-8") as f:
+        json.dump({"chat_ids": chat_ids}, f)
+
+
+def get_notify_chats() -> list[int]:
+    return _load_notify_chats()
+
+
+def add_notify_chat(chat_id: int) -> bool:
+    """Add chat_id to notification list. Returns True if added, False if already exists."""
+    chats = _load_notify_chats()
+    if chat_id in chats:
+        return False
+    chats.append(chat_id)
+    _save_notify_chats(chats)
+    return True
+
+
+def remove_notify_chat(chat_id: int) -> bool:
+    """Remove chat_id from notification list. Returns True if removed."""
+    chats = _load_notify_chats()
+    if chat_id not in chats:
+        return False
+    chats.remove(chat_id)
+    _save_notify_chats(chats)
+    return True
+
 
 def save_notify_chat(chat_id: int):
-    with open(NOTIFY_CHAT_FILE, "w", encoding="utf-8") as f:
-        json.dump({"chat_id": chat_id}, f)
+    """Legacy: ensure chat_id is in the list."""
+    add_notify_chat(chat_id)
 
 
 def get_notify_chat() -> int | None:
-    if not os.path.exists(NOTIFY_CHAT_FILE):
-        return None
-    with open(NOTIFY_CHAT_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("chat_id")
+    """Legacy: return first chat or None."""
+    chats = _load_notify_chats()
+    return chats[0] if chats else None
 
 
 # ── War state persistence (for transition detection across restarts) ───────────

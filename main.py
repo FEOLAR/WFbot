@@ -557,18 +557,22 @@ async def war_state_monitor(bot):
     while True:
         await asyncio.sleep(60)
         try:
-            chat_id = storage.get_notify_chat()
-            if not chat_id:
+            chat_ids = storage.get_notify_chats()
+            if not chat_ids:
                 continue
 
             war = await coc_client.get_current_war(CLAN_TAG)
             current_state = war.state.value if war and war.state else "notInWar"
 
             if previous_state is not None and previous_state != current_state:
-                if previous_state == "preparation" and current_state == "inWar":
-                    await send_war_start(bot, chat_id, war)
-                elif previous_state == "inWar" and current_state == "warEnded":
-                    await send_war_end(bot, chat_id, war)
+                for chat_id in chat_ids:
+                    try:
+                        if previous_state == "preparation" and current_state == "inWar":
+                            await send_war_start(bot, chat_id, war)
+                        elif previous_state == "inWar" and current_state == "warEnded":
+                            await send_war_end(bot, chat_id, war)
+                    except Exception as e:
+                        logger.warning(f"war_state_watcher: ошибка отправки в {chat_id}: {e}")
 
             # Also auto-save if we see warEnded state (belt-and-suspenders)
             if current_state == "warEnded":
@@ -589,18 +593,22 @@ async def war_auto_broadcast(bot):
     while True:
         await asyncio.sleep(7200)  # 2 часа — ждём СНАЧАЛА, чтобы не слать при каждом перезапуске
         try:
-            chat_id = storage.get_notify_chat()
-            if not chat_id:
-                logger.debug("war_auto_broadcast: chat_id not set yet, waiting...")
+            chat_ids = storage.get_notify_chats()
+            if not chat_ids:
+                logger.debug("war_auto_broadcast: chat_ids not set yet, waiting...")
                 continue
             text, keep_going = await build_war_message()
             if keep_going:
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
-                    parse_mode="HTML",
-                    reply_markup=KV_BUTTONS,
-                )
+                for chat_id in chat_ids:
+                    try:
+                        await bot.send_message(
+                            chat_id=chat_id,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=KV_BUTTONS,
+                        )
+                    except Exception as e:
+                        logger.warning(f"war_auto_broadcast: ошибка отправки в {chat_id}: {e}")
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -1002,8 +1010,8 @@ async def cwl_state_monitor(bot):
     while True:
         await asyncio.sleep(60)
         try:
-            chat_id = storage.get_notify_chat()
-            if not chat_id:
+            chat_ids = storage.get_notify_chats()
+            if not chat_ids:
                 continue
 
             group = await coc_client.get_league_group(CLAN_TAG)
@@ -1014,13 +1022,21 @@ async def cwl_state_monitor(bot):
             if current_state == "inWar" and (prev_state != "inWar" or current_round != prev_round):
                 war, _, _ = await get_cwl_clan_war()
                 if war:
-                    await send_cwl_start(bot, chat_id, war, group, current_round)
+                    for chat_id in chat_ids:
+                        try:
+                            await send_cwl_start(bot, chat_id, war, group, current_round)
+                        except Exception as e:
+                            logger.warning(f"cwl_watcher: ошибка отправки в {chat_id}: {e}")
 
             # Round ended
             elif current_state == "warEnded" and prev_state == "inWar":
                 war, _, _ = await get_cwl_clan_war(coc.WarRound.previous_war)
                 if war:
-                    await send_cwl_end(bot, chat_id, war, prev_round)
+                    for chat_id in chat_ids:
+                        try:
+                            await send_cwl_end(bot, chat_id, war, prev_round)
+                        except Exception as e:
+                            logger.warning(f"cwl_watcher: ошибка отправки в {chat_id}: {e}")
 
             if current_state != prev_state or current_round != prev_round:
                 storage.save_cwl_state(current_state, current_round)
@@ -1073,6 +1089,65 @@ async def testcwlend_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
+async def addchat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("⛔ Только для администратора.")
+        return
+    chat_id = update.effective_chat.id
+    chat_type = update.effective_chat.type
+    chat_title = update.effective_chat.title or "личка"
+    added = storage.add_notify_chat(chat_id)
+    if added:
+        await update.message.reply_text(
+            f"✅ Чат добавлен в рассылку!\n"
+            f"<b>{chat_title}</b> (ID: <code>{chat_id}</code>, тип: {chat_type})\n\n"
+            "Теперь уведомления о КВ и ЛВК будут приходить сюда.",
+            parse_mode="HTML",
+        )
+    else:
+        await update.message.reply_text(
+            f"ℹ️ Этот чат уже в списке рассылки.\n"
+            f"ID: <code>{chat_id}</code>",
+            parse_mode="HTML",
+        )
+
+
+async def removechat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("⛔ Только для администратора.")
+        return
+    chat_id = update.effective_chat.id
+    chat_title = update.effective_chat.title or "личка"
+    removed = storage.remove_notify_chat(chat_id)
+    if removed:
+        await update.message.reply_text(
+            f"✅ Чат удалён из рассылки.\n"
+            f"<b>{chat_title}</b> (ID: <code>{chat_id}</code>)",
+            parse_mode="HTML",
+        )
+    else:
+        await update.message.reply_text(
+            f"ℹ️ Этот чат не был в списке рассылки.\n"
+            f"ID: <code>{chat_id}</code>",
+            parse_mode="HTML",
+        )
+
+
+async def listchats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_feolar(update):
+        await update.message.reply_text("⛔ Только для администратора.")
+        return
+    chats = storage.get_notify_chats()
+    if not chats:
+        await update.message.reply_text("📭 Список чатов для рассылки пуст.")
+        return
+    lines = [f"📬 <b>Чаты для рассылки ({len(chats)}):</b>"]
+    for i, cid in enumerate(chats, 1):
+        lines.append(f"  {i}. <code>{cid}</code>")
+    lines.append("\nℹ️ /addchat — добавить текущий чат\n/removechat — убрать текущий чат")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+
 async def post_init(application):
     await coc_client.login(COC_EMAIL, COC_PASSWORD)
     logger.info("CoC клиент авторизован")
@@ -1091,9 +1166,12 @@ async def post_init(application):
         BotCommand("statistic","📊 Статистика клана (Excel)"),
         BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
         BotCommand("help",     "❓ Помощь по командам"),
-        BotCommand("link",     "🛡 [Адм] Привязать игрока к Telegram"),
-        BotCommand("unlink",   "🛡 [Адм] Убрать привязку игрока"),
-        BotCommand("links",    "🛡 [Адм] Список всех привязок"),
+        BotCommand("link",       "🛡 [Адм] Привязать игрока к Telegram"),
+        BotCommand("unlink",     "🛡 [Адм] Убрать привязку игрока"),
+        BotCommand("links",      "🛡 [Адм] Список всех привязок"),
+        BotCommand("addchat",    "🛡 [Адм] Добавить чат в рассылку"),
+        BotCommand("removechat", "🛡 [Адм] Убрать чат из рассылки"),
+        BotCommand("listchats",  "🛡 [Адм] Список чатов рассылки"),
     ])
     await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
     logger.info("Команды бота зарегистрированы")
@@ -1154,6 +1232,9 @@ def main():
     app.add_handler(CommandHandler("statistic", statistic_command))
     app.add_handler(CommandHandler("testcwlstart", testcwlstart_command))
     app.add_handler(CommandHandler("testcwlend", testcwlend_command))
+    app.add_handler(CommandHandler("addchat", addchat_command))
+    app.add_handler(CommandHandler("removechat", removechat_command))
+    app.add_handler(CommandHandler("listchats", listchats_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     app.add_error_handler(conflict_error_handler)
 
