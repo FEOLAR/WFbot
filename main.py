@@ -14,6 +14,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import storage
 import stats_storage
 import excel_builder
+import card_builder
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -1089,6 +1090,36 @@ async def testcwlend_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
+CARD_BG_PATH = "card_background.jpg"  # Пользователь может заменить этот файл
+
+async def card_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("🎨 Генерирую карточку клана, подождите...")
+    try:
+        clan = await coc_client.get_clan(CLAN_TAG)
+        raids = []
+        try:
+            async for r in await coc_client.get_raid_log(CLAN_TAG, limit=4):
+                raids.append(r)
+        except Exception:
+            pass
+        bg_path = CARD_BG_PATH if __import__("os").path.exists(CARD_BG_PATH) else None
+        buf = await card_builder.build_card(clan, raids=raids, background_path=bg_path)
+        await update.message.reply_photo(
+            photo=buf,
+            caption=(
+                f"🏰 <b>{clan.name}</b>  ·  Уровень {clan.level}\n"
+                f"👥 {clan.member_count} участников  ·  "
+                f"⚔️ {clan.war_wins}П / {clan.war_losses}П"
+            ),
+            parse_mode="HTML",
+        )
+        await msg.delete()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        await msg.edit_text(f"❌ Ошибка генерации карточки: {e}")
+
+
 async def addchat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_feolar(update):
         await update.message.reply_text("⛔ Только для администратора.")
@@ -1164,6 +1195,7 @@ async def post_init(application):
         BotCommand("kv",       "⚔️ Атаки в клановой войне"),
         BotCommand("cwl",      "🏆 Статус Лиги войн клана"),
         BotCommand("statistic","📊 Статистика клана (Excel)"),
+        BotCommand("card",     "🎨 Карточка клана"),
         BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
         BotCommand("help",     "❓ Помощь по командам"),
         BotCommand("link",       "🛡 [Адм] Привязать игрока к Telegram"),
@@ -1232,6 +1264,7 @@ def main():
     app.add_handler(CommandHandler("statistic", statistic_command))
     app.add_handler(CommandHandler("testcwlstart", testcwlstart_command))
     app.add_handler(CommandHandler("testcwlend", testcwlend_command))
+    app.add_handler(CommandHandler("card", card_command))
     app.add_handler(CommandHandler("addchat", addchat_command))
     app.add_handler(CommandHandler("removechat", removechat_command))
     app.add_handler(CommandHandler("listchats", listchats_command))
