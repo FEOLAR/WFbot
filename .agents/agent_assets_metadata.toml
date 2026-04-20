@@ -6,6 +6,24 @@ uri = "file://card_background.png"
 type = "image"
 title = "warfil clan card background"
 
+[[generated]]
+id = "2PiHpefXUMT0ibhrfw8J4"
+uri = "file://card_bg_2.png"
+type = "image"
+title = "warfil bg 2 castle aurora"
+
+[[generated]]
+id = "rWU9T6DZgmzdtYOz8vPZZ"
+uri = "file://card_bg_3.png"
+type = "image"
+title = "warfil bg 3 cosmic runes"
+
+[[generated]]
+id = "ZUoK6lXftfqLE71gqc2JK"
+uri = "file://card_bg_4.png"
+type = "image"
+title = "warfil bg 4 dragon lair"
+
 [[outputs]]
 id = "8Fb46LV2h3wQXwH9dMeQW"
 uri = "file://attached_assets/test_card_preview.png"
@@ -41,3 +59,27 @@ id = "PRIZlJlh5mAS4-MNtcJhc"
 uri = "file://attached_assets/test_card_v5.png"
 type = "image"
 title = "Карточка v5 — Nunito, перевод, без лишних блоков"
+
+[[outputs]]
+id = "1netpEZ0RcJ1ZoHBfEGoI"
+uri = "file://attached_assets/preview_card_background.png"
+type = "image"
+title = "Фон 1 — Замок с фиолетовыми огнями"
+
+[[outputs]]
+id = "QP8FgEV3_a70DvTp3jh8P"
+uri = "file://attached_assets/preview_card_bg_2.png"
+type = "image"
+title = "Фон 2 — Фиолетовая аврора"
+
+[[outputs]]
+id = "m_2ZEKgop9xGIgtiZ6s17"
+uri = "file://attached_assets/preview_card_bg_3.png"
+type = "image"
+title = "Фон 3 — Космические руны"
+
+[[outputs]]
+id = "FT9uRU34wHfKX7jcZ8k4C"
+uri = "file://attached_assets/preview_card_bg_4.png"
+type = "image"
+title = "Фон 4 — Логово дракона"

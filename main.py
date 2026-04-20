@@ -1090,7 +1090,12 @@ async def testcwlend_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
-CARD_BG_PATH = "card_background.png"
+CARD_BACKGROUNDS = [
+    "card_background.png",
+    "card_bg_2.png",
+    "card_bg_3.png",
+    "card_bg_4.png",
+]
 
 async def card_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("🎨 Генерирую карточку клана, подождите...")
@@ -1102,7 +1107,8 @@ async def card_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raids.append(r)
         except Exception:
             pass
-        bg_path = CARD_BG_PATH if __import__("os").path.exists(CARD_BG_PATH) else None
+        available = [p for p in CARD_BACKGROUNDS if os.path.exists(p)]
+        bg_path = __import__("random").choice(available) if available else None
         buf = await card_builder.build_card(clan, raids=raids, background_path=bg_path)
         await update.message.reply_photo(
             photo=buf,

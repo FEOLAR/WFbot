@@ -33,7 +33,7 @@ TH_COLORS = {
 }
 
 LEAGUE_RU = {
-    "Legend League":          "Лига Легенд",
+    "Legend League":          "Легендарная лига",
     "Titan League I":         "Лига Титанов I",
     "Titan League II":        "Лига Титанов II",
     "Titan League III":       "Лига Титанов III",
@@ -43,9 +43,9 @@ LEAGUE_RU = {
     "Master League I":        "Мастер лига I",
     "Master League II":       "Мастер лига II",
     "Master League III":      "Мастер лига III",
-    "Crystal League I":       "Кристальная лига I",
-    "Crystal League II":      "Кристальная лига II",
-    "Crystal League III":     "Кристальная лига III",
+    "Crystal League I":       "Хрустальная лига I",
+    "Crystal League II":      "Хрустальная лига II",
+    "Crystal League III":     "Хрустальная лига III",
     "Gold League I":          "Золотая лига I",
     "Gold League II":         "Золотая лига II",
     "Gold League III":        "Золотая лига III",
@@ -286,37 +286,17 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
         _txt(draw, RX + 14, 144, f"{start}  ·  {len(r0_members)} участников",
              size=13, color=C_GRAY)
 
-    # ── История рейдов (компактно) ───────────────────────────────────────────
-    _panel(draw, RX, 210, RX + 535, 510)
-    _txt(draw, RX + 14, 220, "История рейдов", size=13, weight=700, color=C_GOLD)
-
-    if raids:
-        headers = ["Дата", "Добыто золота", "Участников"]
-        hx = [RX + 14, RX + 180, RX + 390]
-        for i, h in enumerate(headers):
-            _txt(draw, hx[i], 248, h, size=11, color=C_GRAY)
-
-        y_r = 272
-        for i, r in enumerate(raids[:4]):
-            try:
-                start = r.start_time.time.strftime("%d.%m.%Y")
-            except Exception:
-                start = "—"
-            loot   = getattr(r, "total_loot", 0) or 0
-            r_mems = list(getattr(r, "members", None) or [])
-            w = 700 if i == 0 else 400
-            c = C_WHITE if i == 0 else C_GRAY
-            _txt(draw, hx[0], y_r, start, size=14, weight=w, color=c)
-            _txt(draw, hx[1], y_r,
-                 f"{loot:,}".replace(",", " "),
-                 size=14, weight=w, color=C_GOLD if i == 0 else C_GRAY)
-            _txt(draw, hx[2], y_r, str(len(r_mems)), size=14, weight=w, color=c)
-            y_r += 50
-    else:
-        _txt(draw, RX + 14, 260, "Нет данных по рейдам", size=14, color=C_GRAY)
+    # ── Сайт клана ──────────────────────────────────────────────────────────
+    _panel(draw, RX, 210, RX + 535, 420)
+    _txt(draw, RX + 14, 222, "Сайт клана", size=12, color=C_GRAY)
+    _txt(draw, RX + 14, 246, "www.warfilcoc.ru", size=22, weight=800, color=C_PURPLE)
+    _txt(draw, RX + 14, 284, "Вся статистика, хроники и информация о клане —", size=13, color=C_WHITE)
+    _txt(draw, RX + 14, 308, "на официальном сайте Warfil.", size=13, color=C_WHITE)
+    _txt(draw, RX + 14, 344, "Вступить в клан:", size=12, color=C_GRAY)
+    _txt(draw, RX + 14, 366, f"#{clan.tag.lstrip('#')}  ·  {TYPE_RU.get(str(clan.type or 'open'), str(clan.type or 'open'))}", size=14, weight=700, color=C_GOLD)
 
     # ── Обновлено (без панели) ───────────────────────────────────────────────
-    _txt(draw, RX + 14, 526,
+    _txt(draw, RX + 14, 432,
          f"warfilcoc.ru  ·  обновлено {datetime.now().strftime('%d.%m.%Y %H:%M')}",
          size=12, color=(130, 130, 130, 200))
 
