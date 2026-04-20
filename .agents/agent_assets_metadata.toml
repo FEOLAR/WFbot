@@ -23,3 +23,9 @@ id = "8U028pJOwObnTh7FBLAEg"
 uri = "file://attached_assets/test_card_v2.png"
 type = "image"
 title = "Карточка без «Требований» с прозрачными блоками"
+
+[[outputs]]
+id = "Fv9eMjIiWrIMB9V3IT8vP"
+uri = "file://attached_assets/test_card_v3.png"
+type = "image"
+title = "Карточка с полностью прозрачными блоками"
