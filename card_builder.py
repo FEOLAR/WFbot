@@ -19,8 +19,8 @@ C_RED     = (220,  70,  70, 255)
 C_ORANGE  = (240, 155,  50, 255)
 C_BLUE    = ( 80, 160, 230, 255)
 C_PURPLE  = (150,  80, 220, 255)
-C_PANEL   = (  0,  10,  30, 175)
-C_PANEL2  = (  0,  10,  30, 210)
+C_PANEL   = (  0,  10,  30,  55)
+C_PANEL2  = (  0,  10,  30,  75)
 
 TH_COLORS = {
     18: (220, 170, 40),
@@ -130,7 +130,7 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
 
     # ── TH distribution ─────────────────────────────────────────────────────
     ths = Counter(m.town_hall for m in members_list)
-    _panel(draw, LX, 200, 400, 560)
+    _panel(draw, LX, 200, 400, 710)
     _txt(draw, LX + 14, 208, "Состав по ратушам", size=13, bold=True, color=C_GOLD)
 
     y_th = 232
@@ -148,16 +148,6 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
         _bar(draw, LX + 70, y_th + 3, bar_w, 14, ratio, fg=fg)
         _txt(draw, LX + 294, y_th, f"{count} / {pct:.0f}%", size=12, color=C_GRAY)
         y_th += 34
-
-    # ── Required trophies ───────────────────────────────────────────────────
-    _panel(draw, LX, 570, 400, 710)
-    _txt(draw, LX + 14, 578, "Требования · Мин. трофеев", size=12, color=C_GRAY)
-    _txt(draw, LX + 14, 598, str(clan.required_trophies or 0),
-         size=28, bold=True, color=C_GOLD)
-    _txt(draw, LX + 150, 578, "Мин. трофеев BB", size=12, color=C_GRAY)
-    _txt(draw, LX + 150, 598,
-         str(getattr(clan, "required_builder_base_trophies", 0) or 0),
-         size=28, bold=True, color=C_BLUE)
 
     # ────────────────────────────────────────────────────────────────────────
     # MIDDLE COLUMN  (x: 420 → 700)

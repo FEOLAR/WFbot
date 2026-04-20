@@ -17,3 +17,9 @@ id = "9MaFmTJPktlp4H4gx_MOL"
 uri = "file://card_background.png"
 type = "image"
 title = "Сгенерированный задний фон"
+
+[[outputs]]
+id = "8U028pJOwObnTh7FBLAEg"
+uri = "file://attached_assets/test_card_v2.png"
+type = "image"
+title = "Карточка без «Требований» с прозрачными блоками"
