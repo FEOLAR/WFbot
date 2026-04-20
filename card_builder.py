@@ -1,26 +1,24 @@
 import io
 import asyncio
 import httpx
+from datetime import datetime
 from collections import Counter
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-FONT_REG  = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT_PATH = "fonts/Nunito-Regular.ttf"
 
 W, H = 1280, 720
 
 # Palette
 C_WHITE   = (255, 255, 255, 255)
-C_GRAY    = (170, 170, 170, 255)
+C_GRAY    = (180, 180, 180, 255)
 C_DARK    = (12,  16,  30,  255)
-C_GOLD    = (255, 200,  50, 255)
-C_GREEN   = ( 80, 200, 100, 255)
-C_RED     = (220,  70,  70, 255)
-C_ORANGE  = (240, 155,  50, 255)
-C_BLUE    = ( 80, 160, 230, 255)
-C_PURPLE  = (150,  80, 220, 255)
+C_GOLD    = (255, 205,  55, 255)
+C_GREEN   = ( 80, 210, 110, 255)
+C_RED     = (225,  75,  75, 255)
+C_ORANGE  = (245, 160,  55, 255)
+C_PURPLE  = (175, 100, 240, 255)
 C_PANEL   = (  0,   0,  15,  80)
-C_PANEL2  = (  0,   0,  15, 110)
 
 TH_COLORS = {
     18: (220, 170, 40),
@@ -31,11 +29,62 @@ TH_COLORS = {
     13: (200,  80,  80),
     12: (140, 140, 140),
     11: (100, 100, 100),
+    10: ( 80,  80,  80),
+}
+
+LEAGUE_RU = {
+    "Legend League":          "Лига Легенд",
+    "Titan League I":         "Лига Титанов I",
+    "Titan League II":        "Лига Титанов II",
+    "Titan League III":       "Лига Титанов III",
+    "Champion League I":      "Чемпионская лига I",
+    "Champion League II":     "Чемпионская лига II",
+    "Champion League III":    "Чемпионская лига III",
+    "Master League I":        "Мастер лига I",
+    "Master League II":       "Мастер лига II",
+    "Master League III":      "Мастер лига III",
+    "Crystal League I":       "Кристальная лига I",
+    "Crystal League II":      "Кристальная лига II",
+    "Crystal League III":     "Кристальная лига III",
+    "Gold League I":          "Золотая лига I",
+    "Gold League II":         "Золотая лига II",
+    "Gold League III":        "Золотая лига III",
+    "Silver League I":        "Серебряная лига I",
+    "Silver League II":       "Серебряная лига II",
+    "Silver League III":      "Серебряная лига III",
+    "Bronze League I":        "Бронзовая лига I",
+    "Bronze League II":       "Бронзовая лига II",
+    "Bronze League III":      "Бронзовая лига III",
+    "Unranked":               "Без ранга",
+}
+
+FREQ_RU = {
+    "always":               "Всегда",
+    "moreThanOncePerWeek":  "Часто",
+    "oncePerWeek":          "Раз в неделю",
+    "lessThanOncePerWeek":  "Редко",
+    "never":                "Никогда",
+    "unknown":              "Неизвестно",
+}
+
+TYPE_RU = {
+    "open":         "открытый",
+    "inviteOnly":   "по приглашению",
+    "closed":       "закрытый",
 }
 
 
-def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(FONT_BOLD if bold else FONT_REG, size)
+def _ru_league(name: str) -> str:
+    return LEAGUE_RU.get(str(name), str(name))
+
+
+def _font(size: int, weight: int = 400) -> ImageFont.FreeTypeFont:
+    try:
+        font = ImageFont.truetype(FONT_PATH, size)
+        font.set_variation_by_axes([weight])
+        return font
+    except Exception:
+        return ImageFont.truetype(FONT_PATH, size)
 
 
 def _panel(draw: ImageDraw.ImageDraw, x1, y1, x2, y2, color=C_PANEL, r=14):
@@ -49,8 +98,8 @@ def _bar(draw, x, y, w, h, fill_ratio, bg=(50, 50, 70, 200), fg=None):
         draw.rounded_rectangle([x, y, x + fw, y + h], radius=h // 2, fill=fg)
 
 
-def _txt(draw, x, y, text, size=16, bold=False, color=C_WHITE, anchor="la"):
-    draw.text((x, y), text, font=_font(size, bold), fill=color, anchor=anchor)
+def _txt(draw, x, y, text, size=16, weight=400, color=C_WHITE, anchor="la"):
+    draw.text((x, y), str(text), font=_font(size, weight), fill=color, anchor=anchor)
 
 
 async def _dl_image(url: str, size: tuple | None = None) -> Image.Image | None:
@@ -75,22 +124,14 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
             bg = Image.new("RGBA", (W, H), C_DARK)
     else:
         bg = Image.new("RGBA", (W, H), C_DARK)
-        # Subtle gradient-like dark overlay
-        grad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        gd = ImageDraw.Draw(grad)
-        for i in range(H):
-            alpha = int(60 * (1 - i / H))
-            gd.line([(0, i), (W, i)], fill=(20, 10, 40, alpha))
-        bg = Image.alpha_composite(bg, grad)
 
-    # Semi-transparent overlay to darken background for readability
-    overlay = Image.new("RGBA", (W, H), (0, 5, 20, 140))
+    overlay = Image.new("RGBA", (W, H), (0, 5, 20, 130))
     bg = Image.alpha_composite(bg, overlay)
 
     draw = ImageDraw.Draw(bg, "RGBA")
 
     # ────────────────────────────────────────────────────────────────────────
-    # LEFT COLUMN  (x: 15 → 410)
+    # LEFT COLUMN  (x: 15 → 405)
     # ────────────────────────────────────────────────────────────────────────
     LX = 15
 
@@ -102,39 +143,39 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
     if badge_img:
         bg.paste(badge_img, (LX, 15), badge_img)
 
-    # Clan level circle on top of badge
+    # Level circle
     lv_x, lv_y = LX + BADGE_SZ // 2, 15 + BADGE_SZ - 14
-    draw.ellipse([lv_x - 16, lv_y - 14, lv_x + 16, lv_y + 14], fill=(60, 20, 100, 230))
-    _txt(draw, lv_x, lv_y, str(clan.level), size=14, bold=True, color=C_GOLD, anchor="mm")
+    draw.ellipse([lv_x - 17, lv_y - 15, lv_x + 17, lv_y + 15], fill=(50, 10, 90, 240))
+    _txt(draw, lv_x, lv_y, clan.level, size=14, weight=700, color=C_GOLD, anchor="mm")
 
     # Clan name + tag + type
     nx = LX + BADGE_SZ + 14
-    _txt(draw, nx, 18,  clan.name,  size=30, bold=True, color=C_WHITE)
-    _txt(draw, nx, 55,  f"#{clan.tag.lstrip('#')}  ·  {clan.type or 'open'}",
-         size=14, color=C_GRAY)
+    _txt(draw, nx, 18,  clan.name, size=30, weight=800, color=C_WHITE)
+    clan_type_ru = TYPE_RU.get(str(clan.type or "open"), str(clan.type or "open"))
+    _txt(draw, nx, 56,  f"#{clan.tag.lstrip('#')}  ·  {clan_type_ru}", size=14, color=C_GRAY)
     desc = clan.description or ""
-    desc_short = desc[:70] + ("..." if len(desc) > 70 else "")
-    _txt(draw, nx, 76,  desc_short, size=12, color=(160, 160, 160, 220))
+    desc_short = desc[:68] + ("…" if len(desc) > 68 else "")
+    _txt(draw, nx, 78,  desc_short, size=11, color=(155, 155, 155, 210))
 
     # ── Members + donations ──────────────────────────────────────────────────
-    _panel(draw, LX, 130, 400, 190)
+    _panel(draw, LX, 130, 405, 192)
     _txt(draw, LX + 14, 140, "Участники",  size=12, color=C_GRAY)
-    _txt(draw, LX + 14, 158, str(clan.member_count), size=26, bold=True, color=C_WHITE)
-    _txt(draw, LX + 90, 140, "Пожертвования (отдано / получено)", size=12, color=C_GRAY)
+    _txt(draw, LX + 14, 158, str(clan.member_count), size=26, weight=700, color=C_WHITE)
+    _txt(draw, LX + 95, 140, "Пожертвования (отдано / получено)", size=12, color=C_GRAY)
     members_list = list(clan.members or [])
     total_given    = sum(m.donations for m in members_list)
     total_received = sum(m.received  for m in members_list)
-    _txt(draw, LX + 90, 158,
+    _txt(draw, LX + 95, 158,
          f"{total_given:,} / {total_received:,}".replace(",", " "),
-         size=20, bold=True, color=C_GOLD)
+         size=20, weight=700, color=C_GOLD)
 
     # ── TH distribution ─────────────────────────────────────────────────────
     ths = Counter(m.town_hall for m in members_list)
-    _panel(draw, LX, 200, 400, 710)
-    _txt(draw, LX + 14, 208, "Состав по ратушам", size=13, bold=True, color=C_GOLD)
+    _panel(draw, LX, 202, 405, 710)
+    _txt(draw, LX + 14, 210, "Состав по ратушам", size=13, weight=700, color=C_GOLD)
 
-    y_th = 232
-    bar_w = 215
+    y_th = 238
+    bar_w = 210
     max_count = max(ths.values()) if ths else 1
     total_m = clan.member_count or 1
 
@@ -144,22 +185,23 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
         ratio = count / max_count
         fg    = TH_COLORS.get(th, (120, 120, 120)) + (220,)
 
-        _txt(draw, LX + 14, y_th, f"TH{th}", size=13, bold=True, color=C_WHITE)
-        _bar(draw, LX + 70, y_th + 3, bar_w, 14, ratio, fg=fg)
-        _txt(draw, LX + 294, y_th, f"{count} / {pct:.0f}%", size=12, color=C_GRAY)
+        _txt(draw, LX + 14, y_th, f"TH{th}", size=13, weight=700, color=C_WHITE)
+        _bar(draw, LX + 72, y_th + 3, bar_w, 14, ratio, fg=fg)
+        _txt(draw, LX + 296, y_th, f"{count} / {pct:.0f}%", size=12, color=C_GRAY)
         y_th += 34
 
     # ────────────────────────────────────────────────────────────────────────
-    # MIDDLE COLUMN  (x: 420 → 700)
+    # MIDDLE COLUMN  (x: 425 → 710)
     # ────────────────────────────────────────────────────────────────────────
-    MX = 420
+    MX = 425
 
     # ── War Frequency ───────────────────────────────────────────────────────
-    _panel(draw, MX, 15, 700, 90)
-    _txt(draw, MX + 14, 22, "War Frequency", size=12, color=C_GRAY)
-    freq = str(clan.war_frequency or "always")
-    fc = C_GREEN if freq == "always" else C_ORANGE if freq == "moreThanOncePerWeek" else C_RED
-    _txt(draw, MX + 14, 42, freq, size=20, bold=True, color=fc)
+    _panel(draw, MX, 15, 710, 94)
+    _txt(draw, MX + 14, 24, "Частота войн", size=12, color=C_GRAY)
+    freq_raw = str(clan.war_frequency or "always")
+    freq_ru  = FREQ_RU.get(freq_raw, freq_raw)
+    fc = C_GREEN if freq_raw == "always" else C_ORANGE if freq_raw == "moreThanOncePerWeek" else C_RED
+    _txt(draw, MX + 14, 46, freq_ru, size=20, weight=700, color=fc)
 
     # ── War Stats ───────────────────────────────────────────────────────────
     wins   = clan.war_wins   or 0
@@ -167,28 +209,25 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
     ties   = clan.war_ties   or 0
     total_wars = wins + losses + ties
 
-    _panel(draw, MX, 100, 700, 350)
-    _txt(draw, MX + 14, 108, "War Stats", size=12, color=C_GRAY)
+    _panel(draw, MX, 104, 710, 360)
+    _txt(draw, MX + 14, 112, "Статистика войн", size=12, color=C_GRAY)
 
-    _txt(draw, MX + 14, 130, str(wins),   size=44, bold=True, color=C_GREEN)
-    _txt(draw, MX + 120, 130, str(losses), size=44, bold=True, color=C_RED)
-    _txt(draw, MX + 14,  178, "побед",     size=12, color=C_GRAY)
-    _txt(draw, MX + 120, 178, "поражений", size=12, color=C_GRAY)
+    _txt(draw, MX + 14,  136, str(wins),   size=46, weight=800, color=C_GREEN)
+    _txt(draw, MX + 126, 136, str(losses), size=46, weight=800, color=C_RED)
+    _txt(draw, MX + 14,  186, "побед",     size=12, color=C_GRAY)
+    _txt(draw, MX + 126, 186, "поражений", size=12, color=C_GRAY)
     if ties:
-        _txt(draw, MX + 220, 130, str(ties),   size=28, bold=True, color=C_ORANGE)
-        _txt(draw, MX + 220, 165, "ничьих",    size=12, color=C_GRAY)
+        _txt(draw, MX + 228, 148, str(ties), size=32, weight=700, color=C_ORANGE)
+        _txt(draw, MX + 228, 186, "ничьих",  size=12, color=C_GRAY)
 
-    # Win rate bar
     if total_wars:
         wr = wins / total_wars
-        _txt(draw, MX + 14, 200, f"Винрейт: {wr*100:.1f}%", size=13, color=C_GRAY)
-        _bar(draw, MX + 14, 220, 262, 14, wr,
+        _txt(draw, MX + 14, 208, f"Винрейт: {wr*100:.1f}%", size=13, color=C_GRAY)
+        _bar(draw, MX + 14, 228, 268, 14, wr,
              bg=(180, 60, 60, 160), fg=(80, 200, 100, 220))
 
-    # Recent war dots (last 10 simplified)
-    dot_x = MX + 14
-    dot_y = 246
-    remaining = 10
+    # Dots
+    dot_x, dot_y, remaining = MX + 14, 258, 10
     for color, cnt in [(C_GREEN, wins), (C_ORANGE, ties), (C_RED, losses)]:
         for _ in range(min(cnt, remaining)):
             draw.ellipse([dot_x, dot_y, dot_x + 14, dot_y + 14], fill=color)
@@ -199,70 +238,65 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
         if remaining <= 0:
             break
 
-    # ── CWL League ──────────────────────────────────────────────────────────
-    _panel(draw, MX, 360, 700, 460)
-    _txt(draw, MX + 14, 368, "Clan War League", size=12, color=C_GRAY)
-    cwl_name = str(clan.war_league or "—")
-    _txt(draw, MX + 14, 390, cwl_name, size=18, bold=True, color=C_PURPLE)
+    # ── Лига ЛВК ────────────────────────────────────────────────────────────
+    _panel(draw, MX, 370, 710, 470)
+    _txt(draw, MX + 14, 380, "Лига клановых войн", size=12, color=C_GRAY)
+    cwl_name = _ru_league(clan.war_league or "—")
+    _txt(draw, MX + 14, 402, cwl_name, size=18, weight=700, color=C_PURPLE)
 
-    # ── Capital League ──────────────────────────────────────────────────────
-    _panel(draw, MX, 470, 700, 570)
-    _txt(draw, MX + 14, 478, "Capital League", size=12, color=C_GRAY)
-    cap_lg = str(getattr(clan, "capital_league", None) or "—")
-    _txt(draw, MX + 14, 498, cap_lg, size=18, bold=True, color=C_GOLD)
+    # ── Столичная лига ──────────────────────────────────────────────────────
+    cap_lg_raw = str(getattr(clan, "capital_league", None) or "—")
+    cap_lg     = _ru_league(cap_lg_raw)
 
-    # ── Description ─────────────────────────────────────────────────────────
-    _panel(draw, MX, 580, 700, 710)
-    _txt(draw, MX + 14, 588, "Описание клана", size=12, color=C_GRAY)
-    desc_lines = []
-    words = (clan.description or "Без описания").split()
-    line = ""
-    for w in words:
-        if len(line + " " + w) <= 32:
-            line = (line + " " + w).strip()
-        else:
-            desc_lines.append(line)
-            line = w
-        if len(desc_lines) >= 4:
-            break
-    if line and len(desc_lines) < 4:
-        desc_lines.append(line)
-    for i, dl in enumerate(desc_lines[:4]):
-        _txt(draw, MX + 14, 608 + i * 22, dl, size=13, color=C_WHITE)
+    _panel(draw, MX, 480, 710, 580)
+    _txt(draw, MX + 14, 490, "Столичная лига", size=12, color=C_GRAY)
+    _txt(draw, MX + 14, 512, cap_lg, size=18, weight=700, color=C_GOLD)
+
+    # ── Итого войн (внизу средней колонки) ──────────────────────────────────
+    _panel(draw, MX, 590, 710, 710)
+    _txt(draw, MX + 14, 600, "Войны — итого", size=12, color=C_GRAY)
+    _txt(draw, MX + 14, 620,
+         f"Победы: {wins}   Поражения: {losses}",
+         size=13, weight=700, color=C_WHITE)
+    if total_wars:
+        _txt(draw, MX + 14, 644,
+             f"Ничьи: {ties}   Всего: {total_wars}   Винрейт: {wins/total_wars*100:.1f}%",
+             size=12, color=C_GRAY)
 
     # ────────────────────────────────────────────────────────────────────────
-    # RIGHT COLUMN  (x: 715 → 1265)
+    # RIGHT COLUMN  (x: 730 → 1265)
     # ────────────────────────────────────────────────────────────────────────
-    RX = 715
+    RX = 730
 
-    # ── Raids League + loot ─────────────────────────────────────────────────
-    _panel(draw, RX, 15, RX + 260, 165)
-    _txt(draw, RX + 14, 22, "Raids League", size=12, color=C_GRAY)
-    _txt(draw, RX + 14, 42, cap_lg, size=16, bold=True, color=C_GOLD)
-    # Latest raid loot
+    # ── Рейдовая лига + последний рейд ──────────────────────────────────────
+    _panel(draw, RX, 15, RX + 535, 200)
+    _txt(draw, RX + 14, 24, "Рейдовая лига", size=12, color=C_GRAY)
+    _txt(draw, RX + 14, 46, cap_lg, size=20, weight=700, color=C_GOLD)
+
     if raids:
         loot = getattr(raids[0], "total_loot", 0) or 0
-        _txt(draw, RX + 14, 76, "Последний рейд:", size=12, color=C_GRAY)
-        _txt(draw, RX + 14, 96, f"{loot:,}".replace(",", " ") + " зол.", size=18, bold=True, color=C_WHITE)
-
-    # ── Capital Peak ────────────────────────────────────────────────────────
-    _panel(draw, RX + 275, 15, RX + 550, 165)
-    _txt(draw, RX + 289, 22, "Capital Peak", size=12, color=C_GRAY)
-    cap_hal = getattr(getattr(clan, "clan_capital", None), "capital_hall_level", None)
-    _txt(draw, RX + 289, 42, f"Ур. {cap_hal}" if cap_hal else "Данные недоступны",
-         size=16, bold=True, color=C_WHITE)
-
-    # Members in raids
-    if raids and raids[0]:
+        try:
+            start = raids[0].start_time.time.strftime("%d.%m.%Y")
+        except Exception:
+            start = "—"
         r0_members = list(getattr(raids[0], "members", None) or [])
-        _txt(draw, RX + 289, 76, f"Участников: {len(r0_members)}", size=13, color=C_GRAY)
+        _txt(draw, RX + 14, 90,  "Последний рейд:", size=12, color=C_GRAY)
+        _txt(draw, RX + 14, 110, f"{loot:,}".replace(",", " ") + " зол.",
+             size=24, weight=700, color=C_WHITE)
+        _txt(draw, RX + 14, 144, f"{start}  ·  {len(r0_members)} участников",
+             size=13, color=C_GRAY)
 
-    # ── Raids Results ───────────────────────────────────────────────────────
-    _panel(draw, RX, 175, RX + 550, 420)
-    _txt(draw, RX + 14, 182, "Raids Results", size=13, bold=True, color=C_GOLD)
+    # ── История рейдов (компактно) ───────────────────────────────────────────
+    _panel(draw, RX, 210, RX + 535, 510)
+    _txt(draw, RX + 14, 220, "История рейдов", size=13, weight=700, color=C_GOLD)
 
     if raids:
-        y_r = 208
+        headers = ["Дата", "Добыто золота", "Участников"]
+        hx = [RX + 14, RX + 180, RX + 390]
+        for i, h in enumerate(headers):
+            _txt(draw, hx[i], 248, h, size=11, color=C_GRAY)
+
+        y_r = 272
         for i, r in enumerate(raids[:4]):
             try:
                 start = r.start_time.time.strftime("%d.%m.%Y")
@@ -270,30 +304,21 @@ async def build_card(clan, raids=None, background_path: str | None = None) -> io
                 start = "—"
             loot   = getattr(r, "total_loot", 0) or 0
             r_mems = list(getattr(r, "members", None) or [])
-            _txt(draw, RX + 14, y_r,
-                 f"{start}   {loot:,}".replace(",", " ") + f"   ({len(r_mems)} уч.)",
-                 size=15, bold=(i == 0), color=C_WHITE if i == 0 else C_GRAY)
-            y_r += 40
+            w = 700 if i == 0 else 400
+            c = C_WHITE if i == 0 else C_GRAY
+            _txt(draw, hx[0], y_r, start, size=14, weight=w, color=c)
+            _txt(draw, hx[1], y_r,
+                 f"{loot:,}".replace(",", " "),
+                 size=14, weight=w, color=C_GOLD if i == 0 else C_GRAY)
+            _txt(draw, hx[2], y_r, str(len(r_mems)), size=14, weight=w, color=c)
+            y_r += 50
     else:
-        _txt(draw, RX + 14, 210, "Нет данных по рейдам", size=14, color=C_GRAY)
+        _txt(draw, RX + 14, 260, "Нет данных по рейдам", size=14, color=C_GRAY)
 
-    # ── War log note ────────────────────────────────────────────────────────
-    _panel(draw, RX, 430, RX + 550, 560)
-    _txt(draw, RX + 14, 438, "Клановые войны — итого", size=12, color=C_GRAY)
-    _txt(draw, RX + 14, 460,
-         f"Победы: {wins}   Поражения: {losses}   Ничьи: {ties}",
-         size=15, bold=True, color=C_WHITE)
-    if total_wars:
-        _txt(draw, RX + 14, 490,
-             f"Всего войн: {total_wars}   Винрейт: {wins/total_wars*100:.1f}%",
-             size=14, color=C_GRAY)
-
-    # ── Bottom watermark ────────────────────────────────────────────────────
-    _panel(draw, RX, 570, RX + 550, 710)
-    _txt(draw, RX + 14, 580, "Warfil Bot  ·  warfilcoc.ru", size=14, color=C_GRAY)
-    _txt(draw, RX + 14, 605,
-         f"Обновлено: {__import__('datetime').datetime.now().strftime('%d.%m.%Y %H:%M')}",
-         size=13, color=(120, 120, 120, 200))
+    # ── Обновлено (без панели) ───────────────────────────────────────────────
+    _txt(draw, RX + 14, 526,
+         f"warfilcoc.ru  ·  обновлено {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+         size=12, color=(130, 130, 130, 200))
 
     # ── Convert & return ────────────────────────────────────────────────────
     final = bg.convert("RGB")

@@ -35,3 +35,9 @@ id = "rs5hD7pa2z_Gk_7_OjeXd"
 uri = "file://attached_assets/test_card_v4.png"
 type = "image"
 title = "Карточка — полупрозрачные блоки, новый фон"
+
+[[outputs]]
+id = "PRIZlJlh5mAS4-MNtcJhc"
+uri = "file://attached_assets/test_card_v5.png"
+type = "image"
+title = "Карточка v5 — Nunito, перевод, без лишних блоков"
