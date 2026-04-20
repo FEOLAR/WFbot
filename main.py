@@ -1090,7 +1090,7 @@ async def testcwlend_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
-CARD_BG_PATH = "card_background.jpg"  # Пользователь может заменить этот файл
+CARD_BG_PATH = "card_background.png"
 
 async def card_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("🎨 Генерирую карточку клана, подождите...")

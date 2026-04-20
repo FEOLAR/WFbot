@@ -1,0 +1,19 @@
+uploads = []
+
+[[generated]]
+id = "_7sFRMW5e1YXkO0L7HKgD"
+uri = "file://card_background.png"
+type = "image"
+title = "warfil clan card background"
+
+[[outputs]]
+id = "8Fb46LV2h3wQXwH9dMeQW"
+uri = "file://attached_assets/test_card_preview.png"
+type = "image"
+title = "Карточка клана Warfil с новым фоном"
+
+[[outputs]]
+id = "9MaFmTJPktlp4H4gx_MOL"
+uri = "file://card_background.png"
+type = "image"
+title = "Сгенерированный задний фон"
