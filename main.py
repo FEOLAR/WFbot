@@ -15,6 +15,7 @@ import storage
 import stats_storage
 import excel_builder
 import card_builder
+import fmt
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -73,10 +74,9 @@ async def build_war_message() -> tuple[str, bool]:
             pending.append((member, used, remaining))
     pending.sort(key=lambda x: x[1])
 
-    state_label = "⚔️ Война идёт" if war.state == "inWar" else "🏁 Война завершена"
+    state_label = "⚔️ ВОЙНА ИДЁТ" if war.state == "inWar" else "🏁 ВОЙНА ЗАВЕРШЕНА"
     our_stars = war.clan.stars
     their_stars = war.opponent.stars
-    stars_line = f"⭐ {our_stars}  vs  {their_stars} ⭐"
 
     time_str = ""
     if war.state == "inWar" and war.end_time:
@@ -84,35 +84,34 @@ async def build_war_message() -> tuple[str, bool]:
         diff = war.end_time.time - now
         total_sec = max(int(diff.total_seconds()), 0)
         h, m = divmod(total_sec // 60, 60)
-        time_str = f"\n⏱ До конца войны: <b>{h}ч {m}мин</b>"
+        time_str = f"\n⏱ До конца: <b>{h}ч {m}мин</b>"
 
     lines = [
         f"<b>{state_label}</b>",
+        fmt.DIV,
         f"🏰 <b>{war.clan.name}</b>  ⚔️  <b>{war.opponent.name}</b>",
-        f"👥 {war.team_size} vs {war.team_size}   {stars_line}" + time_str,
+        f"👥 {war.team_size}v{war.team_size}  ·  ⭐ {our_stars} vs {their_stars}" + time_str,
     ]
 
     if not pending:
-        lines.append("\n✅ <b>Все игроки использовали свои атаки!</b>")
+        lines.append(f"\n{fmt.ok('<b>Все использовали атаки!</b>')}")
     else:
         zero_used = [(mb, r) for mb, u, r in pending if u == 0]
         one_used  = [(mb, r) for mb, u, r in pending if u == 1]
-        lines.append(f"\n⏳ <b>Не атаковали — {len(pending)} чел.</b>")
+        lines.append(f"\n⏳ <b>Осталось атак: {len(pending)} чел.</b>")
         tg_map = storage.get_tg_username_map()
 
         if zero_used:
             lines.append(f"\n🔴 <b>Нет атак ({len(zero_used)}):</b>")
             for member, _ in zero_used:
                 tg = tg_map.get(member.name.lower())
-                tg_str = f"  <i>@{tg}</i>" if tg else ""
-                lines.append(f"  • {member.name}{tg_str}")
+                lines.append(fmt.member_line(member.name, tg=tg))
 
         if one_used:
             lines.append(f"\n🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
             for member, _ in one_used:
                 tg = tg_map.get(member.name.lower())
-                tg_str = f"  <i>@{tg}</i>" if tg else ""
-                lines.append(f"  • {member.name}{tg_str}")
+                lines.append(fmt.member_line(member.name, tg=tg))
 
     keep_updating = war.state == "inWar"
     return "\n".join(lines), keep_updating
@@ -152,15 +151,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Saved war notify chat_id: {update.effective_chat.id}")
 
     text = (
-        f"👋 Привет, <b>{name}</b>!\n\n"
-        "🏰 <b>Добро пожаловать в бот клана Warfil</b>\n\n"
-        "Я официальный бот клана <b>Warfil</b> в Clash of Clans.\n"
-        "Вот что я умею:\n\n"
-        "📋 <b>Список клана</b> — участники с уровнем ратуши и ролью\n"
-        "📊 <b>Статистика</b> — активность и показатели игроков\n"
-        "📝 <b>Анкеты</b> — заявки на вступление с сайта клана\n"
-        "🔔 <b>Уведомления</b> — события в клане\n\n"
-        "⬇️ Используй меню ниже для быстрого доступа к командам."
+        f"👋 Привет, <b>{name}</b>!\n"
+        f"{fmt.DIV}\n"
+        f"{fmt.clan_header()}\n"
+        "<i>Официальный бот клана в Clash of Clans</i>\n\n"
+        f"{fmt.DIV}\n\n"
+        f"📋 /team  — список участников\n"
+        f"⚔️ /kv      — атаки в войне\n"
+        f"🏆 /cwl   — Лига войн клана\n"
+        f"📊 /statistic — статистика Excel\n"
+        f"🎨 /card  — карточка клана\n"
+        f"🔗 /register — привязать аккаунт\n\n"
+        f"{fmt.DIVs}\n"
+        f"🌐 <i>warfilcoc.ru</i>"
     )
 
     # Inline buttons (links)
@@ -176,25 +179,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "📖 <b>Команды бота Warfil</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📋 /team\n"
-        "   Список всех участников клана с уровнем ратуши\n\n"
-        "⚔️ /kv\n"
-        "   Кто ещё не атаковал в текущей клановой войне\n\n"
-        "🔗 /register &lt;ник в CoC&gt;\n"
-        "   Привязать свой Telegram к нику в игре\n"
-        "   <i>Пример: /register WarriorKing</i>\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🛡 <b>Команды администратора</b>\n\n"
-        "🔗 /link @telegram НикВCoC\n"
-        "   Привязать игрока к Telegram\n"
-        "   <i>Пример: /link @feolar Fanon</i>\n\n"
-        "❌ /unlink НикВCoC\n"
-        "   Убрать привязку игрока\n\n"
-        "📋 /links\n"
-        "   Список всех привязок\n"
-        "━━━━━━━━━━━━━━━━━━━━"
+        f"📖 <b>Команды бота Warfil</b>\n"
+        f"{fmt.DIV}\n\n"
+        f"📋 /team\n"
+        f"   Список участников клана\n\n"
+        f"⚔️ /kv\n"
+        f"   Атаки в клановой войне\n\n"
+        f"🏆 /cwl\n"
+        f"   Лига войн клана\n\n"
+        f"📊 /statistic\n"
+        f"   Статистика клана (Excel)\n\n"
+        f"🎨 /card\n"
+        f"   Карточка клана\n\n"
+        f"🔗 /register &lt;ник&gt;\n"
+        f"   Привязать аккаунт CoC\n"
+        f"   <i>Пример: /register WarriorKing</i>\n\n"
+        f"{fmt.DIV}\n"
+        f"🛡 <b>Для администраторов</b>\n\n"
+        f"▸ /link @tg НикВCoC\n"
+        f"▸ /unlink НикВCoC\n"
+        f"▸ /links — все привязки\n"
+        f"{fmt.footer()}"
     )
     await update.message.reply_text(text, parse_mode="HTML")
 
@@ -212,10 +217,12 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tg_username = update.effective_user.username
     storage.register_player(user_id, coc_name, tg_username)
     storage.update_last_seen(user_id)
-    linked = f" (@{tg_username})" if tg_username else ""
+    linked = f" · @{tg_username}" if tg_username else ""
     await update.message.reply_text(
-        f"✅ Готово! Ты зарегистрирован как <b>{coc_name}</b>{linked}.\n"
-        "Теперь ты будешь виден в /team со своим Telegram-ником.",
+        f"🔗 <b>Аккаунт привязан</b>\n"
+        f"{fmt.DIV}\n\n"
+        f"▸ Ник в игре: <b>{coc_name}</b>{linked}\n\n"
+        f"Теперь ты виден в /team со своим Telegram.",
         parse_mode="HTML"
     )
 
@@ -260,7 +267,7 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         lines = [
             f"🏰 <b>{clan.name}</b>  ·  👥 {clan.member_count}/50",
-            "─────────────────────",
+            fmt.DIV,
         ]
 
         for role_key in ["leader", "coLeader", "admin", "member"]:
@@ -271,8 +278,7 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lines.append(ROLE_HEADERS[role_key])
             for m in members:
                 tg = tg_map.get(m.name.lower())
-                tg_str = f"  <i>@{tg}</i>" if tg else ""
-                lines.append(f"  ТХ{m.town_hall} │ {m.name}{tg_str}")
+                lines.append(fmt.member_line(m.name, m.town_hall, tg))
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
@@ -422,13 +428,15 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_war_start(bot, chat_id: int, war):
     opponent = war.opponent.name if war.opponent else "противника"
     text = (
-        "⚔️🔥 <b>ВОЙНА НАЧАЛАСЬ!</b> 🔥⚔️\n\n"
+        f"⚔️ <b>ВОЙНА НАЧАЛАСЬ!</b>\n"
+        f"{fmt.DIV}\n\n"
         f"🏰 <b>Warfil</b>  vs  <b>{opponent}</b>\n"
         f"👥 {war.team_size} на {war.team_size}\n\n"
-        "💥 Боевой день открыт — время показать, на что мы способны!\n\n"
-        "🏆 Желаем красивых атак и славных побед!\n"
-        "⚡ Атакуйте с умом, сражайтесь с честью!\n\n"
-        "<b>Покажем им силу клана Warfil!</b> 💪"
+        f"{fmt.DIVs}\n"
+        f"💥 Боевой день открыт!\n"
+        f"▸ Атакуйте с умом\n"
+        f"▸ Сражайтесь с честью\n\n"
+        f"<b>Удачи бойцам Warfil! 💪</b>"
     )
     await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=KV_BUTTONS)
 
@@ -456,27 +464,26 @@ async def send_war_end(bot, chat_id: int, war):
         result_line = "🤝 <b>Ничья.</b>"
 
     lines = [
-        "🏁 <b>ВОЙНА ЗАВЕРШЕНА!</b>\n",
+        f"🏁 <b>ВОЙНА ЗАВЕРШЕНА</b>",
+        fmt.DIV,
         f"🏰 <b>Warfil</b>  vs  <b>{war.opponent.name}</b>",
-        f"⭐ {our_stars}  vs  {their_stars} ⭐  —  {result_line}",
+        f"⭐ {our_stars}  vs  {their_stars}  ·  {result_line}",
     ]
 
     if attacked:
         lines.append(f"\n✅ <b>Атаковали ({len(attacked)}):</b>")
         for member in attacked:
             tg = tg_map.get(member.name.lower())
-            tg_str = f"  <i>@{tg}</i>" if tg else ""
-            lines.append(f"  • {member.name}{tg_str}")
-        lines.append("\n🔥 Молодцы, продолжайте в том же духе! Вы — гордость клана! 💪")
+            lines.append(fmt.member_line(member.name, tg=tg))
+        lines.append("\n🔥 <i>Молодцы! Вы — гордость клана!</i>")
 
     if missed:
         lines.append(f"\n❌ <b>Не атаковали ({len(missed)}):</b>")
         for member, used in missed:
             tg = tg_map.get(member.name.lower())
-            tg_str = f"  <i>@{tg}</i>" if tg else ""
-            used_str = f" (использовал {used}/{attacks_per_member})" if used > 0 else ""
-            lines.append(f"  • {member.name}{tg_str}{used_str}")
-        lines.append("\n⚠️ <b>Данные игроки попадают в номинацию на кик из клана!</b>")
+            used_str = f" ({used}/{attacks_per_member})" if used > 0 else ""
+            lines.append(fmt.member_line(f"{member.name}{used_str}", tg=tg))
+        lines.append(f"\n{fmt.warn('<b>Игроки без атак — кандидаты на кик!</b>')}")
 
     # Save stats for Excel
     result_str = "win" if our_stars > their_stars else ("lose" if our_stars < their_stars else "tie")
@@ -829,10 +836,12 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             document=buf,
             filename="warfil_statistics.xlsx",
             caption=(
-                "📊 <b>Статистика клана Warfil</b>\n\n"
+                f"📊 <b>Статистика Warfil</b>\n"
+                f"{fmt.DIV}\n\n"
                 f"⚔️ КВ — {len(war_history)} войн\n"
                 f"🏆 ЛВК — {len(cwl_seasons)} сезон(а), {n_cwl_rounds} раундов\n"
-                f"🏛 Рейды — последний рейд"
+                f"🏛 Рейды столицы — последний рейд\n"
+                f"{fmt.footer()}"
             ),
             parse_mode="HTML",
         )
@@ -899,19 +908,19 @@ async def build_cwl_message() -> tuple[str, bool]:
 
     lines = [
         f"<b>{state_label} — Раунд {round_num}</b>",
+        fmt.DIV,
         f"🏰 <b>{our_side.name}</b>  ⚔️  <b>{opp_side.name}</b>",
-        f"⭐ {our_stars}  vs  {their_stars} ⭐" + time_str,
+        f"⭐ {our_stars}  vs  {their_stars}" + time_str,
     ]
 
     if not pending:
-        lines.append("\n✅ <b>Все атаковали в этом раунде!</b>")
+        lines.append(f"\n{fmt.ok('<b>Все атаковали в раунде!</b>')}")
     else:
-        lines.append(f"\n⏳ <b>Не атаковали — {len(pending)} чел.</b>")
+        lines.append(f"\n🔴 <b>Не атаковали — {len(pending)} чел.</b>")
         tg_map = storage.get_tg_username_map()
         for member in pending:
             tg = tg_map.get(member.name.lower())
-            tg_str = f"  <i>@{tg}</i>" if tg else ""
-            lines.append(f"  🔴 {member.name}{tg_str}")
+            lines.append(fmt.member_line(member.name, tg=tg))
 
     keep_updating = group.state == "inWar"
     return "\n".join(lines), keep_updating
@@ -924,12 +933,14 @@ async def send_cwl_start(bot, chat_id: int, war, group, round_num: int):
     opponent_name = opp_side.name if opp_side else "противника"
 
     text = (
-        f"🏆⚔️ <b>ЛВК — РАУНД {round_num} НАЧАЛСЯ!</b> ⚔️🏆\n\n"
+        f"🏆 <b>ЛВК — РАУНД {round_num} НАЧАЛСЯ!</b>\n"
+        f"{fmt.DIV}\n\n"
         f"🏰 <b>Warfil</b>  vs  <b>{opponent_name}</b>\n\n"
-        "💥 Помните — в ЛВК только <b>1 атака</b> на игрока!\n\n"
-        "🎯 Атакуйте с умом, выбирайте цели тщательно!\n"
-        "🏆 Желаем красивых атак и звёздных результатов!\n\n"
-        "<b>Покажем им силу клана Warfil!</b> 💪"
+        f"{fmt.DIVs}\n"
+        f"💥 Помните: в ЛВК только <b>1 атака</b>!\n"
+        f"▸ Выбирайте цели тщательно\n"
+        f"▸ Атакуйте с умом\n\n"
+        f"<b>Удачи бойцам Warfil! 💪</b>"
     )
     await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=KV_BUTTONS)
 
@@ -959,26 +970,25 @@ async def send_cwl_end(bot, chat_id: int, war, round_num: int):
         result_line = "🤝 <b>Ничья в раунде.</b>"
 
     lines = [
-        f"🏁 <b>ЛВК — РАУНД {round_num} ЗАВЕРШЁН!</b>\n",
+        f"🏁 <b>ЛВК — РАУНД {round_num} ЗАВЕРШЁН</b>",
+        fmt.DIV,
         f"🏰 <b>Warfil</b>  vs  <b>{opp_side.name}</b>",
-        f"⭐ {our_stars}  vs  {their_stars} ⭐  —  {result_line}",
+        f"⭐ {our_stars}  vs  {their_stars}  ·  {result_line}",
     ]
 
     if attacked:
         lines.append(f"\n✅ <b>Атаковали ({len(attacked)}):</b>")
         for member in attacked:
             tg = tg_map.get(member.name.lower())
-            tg_str = f"  <i>@{tg}</i>" if tg else ""
-            lines.append(f"  • {member.name}{tg_str}")
-        lines.append("\n🔥 Молодцы! Продолжайте в том же духе! 💪")
+            lines.append(fmt.member_line(member.name, tg=tg))
+        lines.append("\n🔥 <i>Молодцы! Продолжайте в том же духе!</i>")
 
     if missed:
-        lines.append(f"\n❌ <b>Не атаковали в раунде ({len(missed)}):</b>")
+        lines.append(f"\n❌ <b>Не атаковали ({len(missed)}):</b>")
         for member in missed:
             tg = tg_map.get(member.name.lower())
-            tg_str = f"  <i>@{tg}</i>" if tg else ""
-            lines.append(f"  • {member.name}{tg_str}")
-        lines.append("\n⚠️ <b>Данные игроки попадают в номинацию на кик из клана!</b>")
+            lines.append(fmt.member_line(member.name, tg=tg))
+        lines.append(f"\n{fmt.warn('<b>Игроки без атак — кандидаты на кик!</b>')}")
 
     # Save CWL round stats for Excel
     # Determine current season from CWL group if possible (use YYYY-MM format)
