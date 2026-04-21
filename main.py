@@ -93,12 +93,16 @@ async def build_war_message() -> tuple[str, bool]:
         f"👥 {war.team_size}v{war.team_size}  ·  ⭐ {our_stars} vs {their_stars}" + time_str,
     ]
 
+    # Attack progress bar
+    total_attacks = war.team_size * attacks_per_member
+    used_attacks  = total_attacks - sum(r for _, _, r in pending)
+    lines.append(f"\n⚔️ Атаки: {fmt.attacks_bar(used_attacks, total_attacks)}  <i>{used_attacks}/{total_attacks}</i>")
+
     if not pending:
         lines.append(f"\n{fmt.ok('<b>Все использовали атаки!</b>')}")
     else:
         zero_used = [(mb, r) for mb, u, r in pending if u == 0]
         one_used  = [(mb, r) for mb, u, r in pending if u == 1]
-        lines.append(f"\n⏳ <b>Осталось атак: {len(pending)} чел.</b>")
         tg_map = storage.get_tg_username_map()
 
         if zero_used:
@@ -108,11 +112,12 @@ async def build_war_message() -> tuple[str, bool]:
                 lines.append(fmt.member_line(member.name, tg=tg))
 
         if one_used:
-            lines.append(f"\n🟡 <b>Осталась 1 атака ({len(one_used)}):</b>")
+            lines.append(f"\n🟡 <b>Осталась 1 ({len(one_used)}):</b>")
             for member, _ in one_used:
                 tg = tg_map.get(member.name.lower())
                 lines.append(fmt.member_line(member.name, tg=tg))
 
+    lines.append(fmt.footer())
     keep_updating = war.state == "inWar"
     return "\n".join(lines), keep_updating
 
@@ -150,23 +155,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         storage.save_notify_chat(update.effective_chat.id)
         logger.info(f"Saved war notify chat_id: {update.effective_chat.id}")
 
+    # Fetch live clan data for welcome card
+    try:
+        clan = await coc_client.get_clan(CLAN_TAG)
+        stats_block = (
+            f"\n{fmt.DIVs}\n\n"
+            f"{fmt.stat_line('Уровень клана', str(clan.level))}\n"
+            f"{fmt.stat_line('Состав', f'{clan.member_count} / 50')}\n"
+            f"{fmt.stat_line('Побед в войнах', str(clan.war_wins))}\n"
+        )
+    except Exception:
+        stats_block = ""
+
     text = (
         f"👋 Привет, <b>{name}</b>!\n"
         f"{fmt.DIV}\n"
-        f"{fmt.clan_header()}\n"
-        "<i>Официальный бот клана в Clash of Clans</i>\n\n"
-        f"{fmt.DIV}\n\n"
-        f"📋 /team  — список участников\n"
-        f"⚔️ /kv      — атаки в войне\n"
-        f"🏆 /cwl   — Лига войн клана\n"
-        f"📊 /statistic — статистика Excel\n"
-        f"🎨 /card  — карточка клана\n"
-        f"🔗 /register — привязать аккаунт\n\n"
-        f"{fmt.DIVs}\n"
-        f"🌐 <i>warfilcoc.ru</i>"
+        f"{fmt.clan_header()}\n\n"
+        "<i>Warfil — это не просто клан.\n"
+        "Это боевое братство, где стратегия\n"
+        "и честь важнее, чем числа на экране.\n"
+        "Мы атакуем вместе. Побеждаем достойно.</i>"
+        f"{stats_block}"
+        f"\n{fmt.DIV}\n"
+        "Все команды — в меню ниже 👇\n"
+        f"{fmt.footer()}"
     )
 
-    # Inline buttons (links)
     inline_kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🌐 Сайт клана", url=CLAN_WEBSITE),
@@ -275,10 +289,13 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not members:
                 continue
             lines.append("")
-            lines.append(ROLE_HEADERS[role_key])
+            count_str = f"  <i>({len(members)})</i>" if role_key != "leader" else ""
+            lines.append(ROLE_HEADERS[role_key] + count_str)
             for m in members:
                 tg = tg_map.get(m.name.lower())
                 lines.append(fmt.member_line(m.name, m.town_hall, tg))
+
+        lines.append(f"\n{fmt.footer()}")
 
         await msg.edit_text("\n".join(lines), parse_mode="HTML")
 
@@ -922,6 +939,7 @@ async def build_cwl_message() -> tuple[str, bool]:
             tg = tg_map.get(member.name.lower())
             lines.append(fmt.member_line(member.name, tg=tg))
 
+    lines.append(fmt.footer())
     keep_updating = group.state == "inWar"
     return "\n".join(lines), keep_updating
 
