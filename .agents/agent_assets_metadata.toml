@@ -83,3 +83,9 @@ id = "FT9uRU34wHfKX7jcZ8k4C"
 uri = "file://attached_assets/preview_card_bg_4.png"
 type = "image"
 title = "Фон 4 — Логово дракона"
+
+[[outputs]]
+id = "qLJHGNJN-aDYkX-emGMTD"
+uri = "file://warfil_bot.zip"
+type = "unspecified"
+title = "warfil_bot.zip — полный архив бота"
