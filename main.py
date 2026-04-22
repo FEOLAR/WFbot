@@ -8,7 +8,7 @@ import os
 # Fallback: load tokens from config.py if env vars not set
 try:
     import config as _cfg
-    for _k in ("TELEGRAM_BOT_TOKEN", "COC_EMAIL", "COC_PASSWORD", "COC_PROXY"):
+    for _k in ("TELEGRAM_BOT_TOKEN", "COC_EMAIL", "COC_PASSWORD", "COC_API_KEY", "COC_PROXY"):
         if not os.environ.get(_k):
             val = getattr(_cfg, _k, "")
             if val:
@@ -63,9 +63,10 @@ logger = logging.getLogger(__name__)
 
 IS_PRODUCTION = os.environ.get("REPLIT_DEPLOYMENT") == "1"
 
-TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-COC_EMAIL = os.environ["COC_EMAIL"]
-COC_PASSWORD = os.environ["COC_PASSWORD"]
+TOKEN        = os.environ["TELEGRAM_BOT_TOKEN"]
+COC_EMAIL    = os.environ.get("COC_EMAIL", "")
+COC_PASSWORD = os.environ.get("COC_PASSWORD", "")
+COC_API_KEY  = os.environ.get("COC_API_KEY", "")
 CLAN_TAG       = "#2R02GGRUJ"
 CLAN_WEBSITE   = "https://www.warfilcoc.ru"
 TG_GROUP_LINK  = "https://t.me/warfil_clan"   # ← замени на реальную ссылку беседы
@@ -1252,8 +1253,12 @@ async def listchats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def post_init(application):
-    await coc_client.login(COC_EMAIL, COC_PASSWORD)
-    logger.info("CoC клиент авторизован")
+    if COC_API_KEY:
+        await coc_client.login_with_tokens(COC_API_KEY)
+        logger.info("CoC клиент авторизован через API ключ")
+    else:
+        await coc_client.login(COC_EMAIL, COC_PASSWORD)
+        logger.info("CoC клиент авторизован через email/пароль")
 
     asyncio.create_task(war_auto_broadcast(application.bot))
     asyncio.create_task(war_state_monitor(application.bot))
