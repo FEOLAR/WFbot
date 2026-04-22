@@ -86,16 +86,18 @@ async def _coc_safe(fn, *args, **kwargs):
     """Call a coc API function; on IP-Forbidden error re-login and retry once."""
     try:
         return await fn(*args, **kwargs)
-    except coc.errors.Forbidden as e:
-        if "invalidIp" in str(e) and COC_EMAIL and COC_PASSWORD:
-            logger.warning("CoC IP не совпадает — перелогиниваюсь с новым IP...")
+    except (coc.errors.Forbidden, coc.errors.HTTPException) as e:
+        err_str = str(e)
+        if ("invalidIp" in err_str or "403" in err_str) and COC_EMAIL and COC_PASSWORD:
+            logger.warning(f"CoC IP ошибка ({err_str[:80]}) — перелогиниваюсь...")
             try:
-                await coc_client.close()
-            except Exception:
-                pass
-            await coc_client.login(COC_EMAIL, COC_PASSWORD)
-            logger.info("Перелогин выполнен, повторяю запрос...")
-            return await fn(*args, **kwargs)
+                # login() reopens the session internally — не вызываем close() отдельно
+                await coc_client.login(COC_EMAIL, COC_PASSWORD)
+                logger.info("Перелогин выполнен, повторяю запрос...")
+                return await fn(*args, **kwargs)
+            except Exception as re_err:
+                logger.error(f"Перелогин не удался: {re_err}", exc_info=True)
+                raise
         raise
 
 
@@ -359,7 +361,7 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except coc.NotFound:
         await msg.edit_text("❌ Клан не найден. Проверь тег клана.")
     except Exception as e:
-        logger.error(f"Ошибка при получении данных клана: {e}")
+        logger.error(f"Ошибка при получении данных клана: {e}", exc_info=True)
         await msg.edit_text("❌ Не удалось загрузить данные. Попробуй позже.")
 
 
