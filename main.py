@@ -80,6 +80,11 @@ ROLE_ORDER = {
     "member": 3,
 }
 
+
+def _norm_name(name: str) -> str:
+    import unicodedata as _ud
+    return _ud.normalize("NFC", name).lower()
+
 coc_client = coc.Client()
 
 
@@ -252,13 +257,13 @@ async def build_war_message() -> tuple[str, bool]:
         if zero_used:
             lines.append(f"\n🔴 <b>Нет атак ({len(zero_used)}):</b>")
             for member, _ in zero_used:
-                tg = tg_map.get(member.name.lower())
+                tg = tg_map.get(_norm_name(member.name))
                 lines.append(fmt.member_line(member.name, tg=tg))
 
         if one_used:
             lines.append(f"\n🟡 <b>Осталась 1 ({len(one_used)}):</b>")
             for member, _ in one_used:
-                tg = tg_map.get(member.name.lower())
+                tg = tg_map.get(_norm_name(member.name))
                 lines.append(fmt.member_line(member.name, tg=tg))
 
     lines.append(fmt.footer())
@@ -363,14 +368,25 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
+    import unicodedata
+    from html import escape as _esc
+
+    # Берём ник напрямую из текста сообщения — context.args иногда теряет спецсимволы
+    raw_text = update.message.text or ""
+    # Убираем команду (/register или /register@botname) и пробел после неё
+    parts = raw_text.split(None, 1)
+    coc_name_raw = parts[1].strip() if len(parts) > 1 else ""
+
+    if not coc_name_raw:
         await update.message.reply_text(
             "Укажи своё имя в игре.\n"
             "Пример: /register WarriorKing"
         )
         return
 
-    coc_name = " ".join(context.args)
+    # NFC нормализация — обязательна для Unicode никнеймов с со спецсимволами
+    coc_name = unicodedata.normalize("NFC", coc_name_raw)
+
     user_id = update.effective_user.id
     tg_username = update.effective_user.username
     storage.register_player(user_id, coc_name, tg_username)
@@ -379,7 +395,7 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"🔗 <b>Аккаунт привязан</b>\n"
         f"{fmt.DIV}\n\n"
-        f"▸ Ник в игре: <b>{coc_name}</b>{linked}\n\n"
+        f"▸ Ник в игре: <b>{_esc(coc_name)}</b>{linked}\n\n"
         f"Теперь ты виден в /team со своим Telegram.",
         parse_mode="HTML"
     )
@@ -436,7 +452,7 @@ async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             count_str = f"  <i>({len(members)})</i>" if role_key != "leader" else ""
             lines.append(ROLE_HEADERS[role_key] + count_str)
             for m in members:
-                tg = tg_map.get(m.name.lower())
+                tg = tg_map.get(_norm_name(m.name))
                 lines.append(fmt.member_line(m.name, m.town_hall, tg))
 
         lines.append(f"\n{fmt.footer()}")
@@ -634,14 +650,14 @@ async def send_war_end(bot, chat_id: int, war):
     if attacked:
         lines.append(f"\n✅ <b>Атаковали ({len(attacked)}):</b>")
         for member in attacked:
-            tg = tg_map.get(member.name.lower())
+            tg = tg_map.get(_norm_name(member.name))
             lines.append(fmt.member_line(member.name, tg=tg))
         lines.append("\n🔥 <i>Молодцы! Вы — гордость клана!</i>")
 
     if missed:
         lines.append(f"\n❌ <b>Не атаковали ({len(missed)}):</b>")
         for member, used in missed:
-            tg = tg_map.get(member.name.lower())
+            tg = tg_map.get(_norm_name(member.name))
             used_str = f" ({used}/{attacks_per_member})" if used > 0 else ""
             lines.append(fmt.member_line(f"{member.name}{used_str}", tg=tg))
         lines.append(f"\n{fmt.warn('<b>Игроки без атак — кандидаты на кик!</b>')}")
@@ -1080,7 +1096,7 @@ async def build_cwl_message() -> tuple[str, bool]:
         lines.append(f"\n🔴 <b>Не атаковали — {len(pending)} чел.</b>")
         tg_map = storage.get_tg_username_map()
         for member in pending:
-            tg = tg_map.get(member.name.lower())
+            tg = tg_map.get(_norm_name(member.name))
             lines.append(fmt.member_line(member.name, tg=tg))
 
     lines.append(fmt.footer())
@@ -1141,14 +1157,14 @@ async def send_cwl_end(bot, chat_id: int, war, round_num: int):
     if attacked:
         lines.append(f"\n✅ <b>Атаковали ({len(attacked)}):</b>")
         for member in attacked:
-            tg = tg_map.get(member.name.lower())
+            tg = tg_map.get(_norm_name(member.name))
             lines.append(fmt.member_line(member.name, tg=tg))
         lines.append("\n🔥 <i>Молодцы! Продолжайте в том же духе!</i>")
 
     if missed:
         lines.append(f"\n❌ <b>Не атаковали ({len(missed)}):</b>")
         for member in missed:
-            tg = tg_map.get(member.name.lower())
+            tg = tg_map.get(_norm_name(member.name))
             lines.append(fmt.member_line(member.name, tg=tg))
         lines.append(f"\n{fmt.warn('<b>Игроки без атак — кандидаты на кик!</b>')}")
 

@@ -1,8 +1,14 @@
 import json
 import os
+import unicodedata
 from datetime import datetime
 
 import pathlib
+
+
+def _norm(name: str) -> str:
+    """Unicode NFC normalization + lowercase для надёжного сравнения никнеймов."""
+    return unicodedata.normalize("NFC", name).lower()
 
 def _data_dir() -> pathlib.Path:
     p = pathlib.Path("/data")
@@ -82,7 +88,7 @@ def get_last_seen_map() -> dict[str, str]:
         name = entry.get("coc_name", "")
         last_seen = entry.get("last_seen")
         if name:
-            result[name.lower()] = last_seen
+            result[_norm(name)] = last_seen
     return result
 
 
@@ -96,14 +102,14 @@ def get_player_by_telegram(telegram_id: int) -> dict | None:
 def link_player(coc_name: str, tg_username: str):
     """Link a CoC player name to a Telegram username (admin action)."""
     links = _load_links()
-    links[coc_name.lower()] = tg_username.lstrip("@")
+    links[coc__norm(name)] = tg_username.lstrip("@")
     _save_links(links)
 
 
 def unlink_player(coc_name: str) -> bool:
     """Remove link for a CoC player. Returns True if it existed."""
     links = _load_links()
-    key = coc_name.lower()
+    key = coc__norm(name)
     if key in links:
         del links[key]
         _save_links(links)
@@ -128,7 +134,7 @@ def get_tg_username_map() -> dict[str, str]:
         name = entry.get("coc_name", "")
         username = entry.get("telegram_username")
         if name and username:
-            result[name.lower()] = username
+            result[_norm(name)] = username
 
     # Admin links override / supplement
     result.update(_load_links())
