@@ -81,6 +81,24 @@ ROLE_ORDER = {
 
 coc_client = coc.Client()
 
+
+async def _coc_safe(fn, *args, **kwargs):
+    """Call a coc API function; on IP-Forbidden error re-login and retry once."""
+    try:
+        return await fn(*args, **kwargs)
+    except coc.errors.Forbidden as e:
+        if "invalidIp" in str(e) and COC_EMAIL and COC_PASSWORD:
+            logger.warning("CoC IP не совпадает — перелогиниваюсь с новым IP...")
+            try:
+                await coc_client.close()
+            except Exception:
+                pass
+            await coc_client.login(COC_EMAIL, COC_PASSWORD)
+            logger.info("Перелогин выполнен, повторяю запрос...")
+            return await fn(*args, **kwargs)
+        raise
+
+
 # Active auto-update tasks: chat_id -> asyncio.Task
 _kv_tasks: dict[int, asyncio.Task] = {}
 
@@ -95,7 +113,7 @@ KV_BUTTONS = InlineKeyboardMarkup([
 
 async def build_war_message() -> tuple[str, bool]:
     """Fetch current war and return (text, should_keep_updating)."""
-    war = await coc_client.get_current_war(CLAN_TAG)
+    war = await _coc_safe(coc_client.get_current_war, CLAN_TAG)
 
     if war is None or war.state == "notInWar":
         return "🏳️ Клан сейчас не в клановой войне.", False
@@ -196,7 +214,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Fetch live clan data for welcome card
     try:
-        clan = await coc_client.get_clan(CLAN_TAG)
+        clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
         stats_block = (
             f"\n{fmt.DIVs}\n\n"
             f"{fmt.stat_line('Уровень клана', str(clan.level))}\n"
@@ -298,7 +316,7 @@ async def online_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def team_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⏳ Загружаю список клана...")
     try:
-        clan = await coc_client.get_clan(CLAN_TAG)
+        clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
         members_sorted = sorted(
             clan.members,
             key=lambda m: (ROLE_ORDER.get(m.role.value, 9), m.name.lower())
@@ -612,7 +630,7 @@ async def war_state_monitor(bot):
 
     # On startup: if war is already ended, save data immediately (bot may have missed the transition)
     try:
-        startup_war = await coc_client.get_current_war(CLAN_TAG)
+        startup_war = await _coc_safe(coc_client.get_current_war, CLAN_TAG)
         if startup_war and startup_war.state == "warEnded":
             await _try_save_war_ended(startup_war)
     except Exception:
@@ -625,7 +643,7 @@ async def war_state_monitor(bot):
             if not chat_ids:
                 continue
 
-            war = await coc_client.get_current_war(CLAN_TAG)
+            war = await _coc_safe(coc_client.get_current_war, CLAN_TAG)
             current_state = war.state.value if war and war.state else "notInWar"
 
             if previous_state is not None and previous_state != current_state:
@@ -689,7 +707,7 @@ async def teststart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет доступа.")
         return
     try:
-        war = await coc_client.get_current_war(CLAN_TAG)
+        war = await _coc_safe(coc_client.get_current_war, CLAN_TAG)
         if war is None or war.state == "notInWar":
             await update.message.reply_text("⚠️ Клан не в войне — нет данных для теста.")
             return
@@ -703,7 +721,7 @@ async def testend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет доступа.")
         return
     try:
-        war = await coc_client.get_current_war(CLAN_TAG)
+        war = await _coc_safe(coc_client.get_current_war, CLAN_TAG)
         if war is None or war.state == "notInWar":
             await update.message.reply_text("⚠️ Клан не в войне — нет данных для теста.")
             return
@@ -752,7 +770,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ── Fetch clan member list (always available, used as player row fallback) ──
         clan_members: list[dict] = []
         try:
-            clan = await coc_client.get_clan(CLAN_TAG)
+            clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
             for m in (clan.members or []):
                 clan_members.append({"name": m.name, "th": getattr(m, "town_hall", 0)})
         except Exception as e:
@@ -775,7 +793,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Fetch current war for live player data and auto-save if warEnded
         try:
-            cw = await coc_client.get_current_war(CLAN_TAG)
+            cw = await _coc_safe(coc_client.get_current_war, CLAN_TAG)
             if cw and cw.state in ("inWar", "warEnded"):
                 cw_end = cw.end_time.time.isoformat() if cw.end_time else ""
                 members_live = _war_members(cw)
@@ -793,7 +811,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Fetch war log for the last 5 regular wars (summaries)
         war_history: list[dict] = []
         try:
-            async for entry in await coc_client.get_war_log(CLAN_TAG, limit=10):
+            async for entry in await _coc_safe(coc_client.get_war_log, CLAN_TAG, limit=10):
                 # Skip CWL entries (opponent is None)
                 if entry.opponent is None:
                     continue
@@ -835,7 +853,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Live current season
         live_season = None
         try:
-            group = await coc_client.get_league_group(CLAN_TAG)
+            group = await _coc_safe(coc_client.get_league_group, CLAN_TAG)
             live_season = group.season
             live_rounds = []
             round_num = 0
@@ -877,7 +895,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ── 3. Рейды столицы: только последний рейд ────────────────────────────
         raids = []
         try:
-            raid_log = await coc_client.get_raid_log(CLAN_TAG, limit=1)
+            raid_log = await _coc_safe(coc_client.get_raid_log, CLAN_TAG, limit=1)
             async for entry in raid_log:
                 raids.append(entry)
         except Exception as e:
@@ -910,7 +928,7 @@ async def statistic_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def get_cwl_clan_war(war_round=coc.WarRound.current_war):
     """Return (war, group, round_num) for our clan in the requested CWL round, or (None, group, 0)."""
     try:
-        group = await coc_client.get_league_group(CLAN_TAG)
+        group = await _coc_safe(coc_client.get_league_group, CLAN_TAG)
     except (coc.NotFound, Exception):
         return None, None, 0
 
@@ -1050,7 +1068,7 @@ async def send_cwl_end(bot, chat_id: int, war, round_num: int):
     # Save CWL round stats for Excel
     # Determine current season from CWL group if possible (use YYYY-MM format)
     try:
-        group = await coc_client.get_league_group(CLAN_TAG)
+        group = await _coc_safe(coc_client.get_league_group, CLAN_TAG)
         season = group.season or "unknown"
     except Exception:
         season = "unknown"
@@ -1082,7 +1100,7 @@ async def cwl_state_monitor(bot):
             if not chat_ids:
                 continue
 
-            group = await coc_client.get_league_group(CLAN_TAG)
+            group = await _coc_safe(coc_client.get_league_group, CLAN_TAG)
             current_state = group.state or "notInWar"
             current_round = len(group.rounds)
 
@@ -1167,10 +1185,10 @@ CARD_BACKGROUNDS = [
 async def card_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("🎨 Генерирую карточку клана, подождите...")
     try:
-        clan = await coc_client.get_clan(CLAN_TAG)
+        clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
         raids = []
         try:
-            async for r in await coc_client.get_raid_log(CLAN_TAG, limit=4):
+            async for r in await _coc_safe(coc_client.get_raid_log, CLAN_TAG, limit=4):
                 raids.append(r)
         except Exception:
             pass
