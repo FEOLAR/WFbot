@@ -4,6 +4,15 @@ except ImportError:
     pass
 
 import os
+
+# Fallback: load tokens from config.py if env vars not set
+try:
+    import config as _cfg
+    for _k in ("TELEGRAM_BOT_TOKEN", "COC_EMAIL", "COC_PASSWORD"):
+        if not os.environ.get(_k):
+            os.environ[_k] = getattr(_cfg, _k, "")
+except ImportError:
+    pass
 import asyncio
 import logging
 import threading
