@@ -8,11 +8,35 @@ import os
 # Fallback: load tokens from config.py if env vars not set
 try:
     import config as _cfg
-    for _k in ("TELEGRAM_BOT_TOKEN", "COC_EMAIL", "COC_PASSWORD"):
+    for _k in ("TELEGRAM_BOT_TOKEN", "COC_EMAIL", "COC_PASSWORD", "COC_PROXY"):
         if not os.environ.get(_k):
-            os.environ[_k] = getattr(_cfg, _k, "")
+            val = getattr(_cfg, _k, "")
+            if val:
+                os.environ[_k] = val
 except ImportError:
     pass
+
+# ── Proxy setup for Clash of Clans API (static IP) ──────────────────────────
+# Set COC_PROXY in config.py or env to a static HTTP/SOCKS proxy URL.
+# Example: http://user:pass@proxy.example.com:8080
+# This keeps the same IP across restarts so the API key never changes.
+_COC_PROXY = os.environ.get("COC_PROXY") or os.environ.get("QUOTAGUARD_URL")
+if _COC_PROXY:
+    os.environ.setdefault("HTTP_PROXY",  _COC_PROXY)
+    os.environ.setdefault("HTTPS_PROXY", _COC_PROXY)
+    os.environ.setdefault("http_proxy",  _COC_PROXY)
+    os.environ.setdefault("https_proxy", _COC_PROXY)
+    # Patch aiohttp (used by coc.py) to honour env-based proxy
+    try:
+        import aiohttp as _aiohttp
+        _orig_session = _aiohttp.ClientSession.__init__
+        def _proxy_session(self, *a, **kw):
+            kw.setdefault("trust_env", True)
+            _orig_session(self, *a, **kw)
+        _aiohttp.ClientSession.__init__ = _proxy_session
+    except Exception:
+        pass
+
 import asyncio
 import logging
 import threading
