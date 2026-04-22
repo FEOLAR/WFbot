@@ -477,7 +477,14 @@ async def _is_admin(update: Update) -> bool:
 
 async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /link @tg_username Ник в CoC"""
-    if not await _is_admin(update):
+    from html import escape as _esc
+    import unicodedata
+    try:
+        is_admin = await _is_admin(update)
+    except Exception:
+        is_admin = True  # в ЛС всегда разрешаем
+
+    if not is_admin:
         await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
         return
 
@@ -486,24 +493,37 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Использование: /link @telegram НикВCoC\n"
             "Примеры:\n"
             "  /link @feolar Fanon\n"
-            "  /link @feolar fil\n\n"
+            "  /link @feolar ɢʀᴇꜱʜɴɪᴋ⇝ ™\n\n"
             "Один @telegram можно привязать к нескольким никам."
         )
         return
 
     tg_username = context.args[0].lstrip("@")
-    coc_name = " ".join(context.args[1:])
+    # Берём ник из полного текста сообщения чтобы не потерять спецсимволы
+    raw_text = update.message.text or ""
+    after_cmd = raw_text.split(None, 1)[1] if " " in raw_text else ""
+    # after_cmd = "@username ник" — пропускаем первое слово (@username)
+    parts2 = after_cmd.split(None, 1)
+    coc_name_raw = parts2[1].strip() if len(parts2) > 1 else " ".join(context.args[1:])
+    coc_name = unicodedata.normalize("NFC", coc_name_raw)
 
     storage.link_player(coc_name, tg_username)
     await update.message.reply_text(
-        f"✅ <b>{coc_name}</b> привязан к @{tg_username}",
+        f"✅ <b>{_esc(coc_name)}</b> привязан к @{tg_username}",
         parse_mode="HTML"
     )
 
 
 async def unlink_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /unlink Ник в CoC"""
-    if not await _is_admin(update):
+    from html import escape as _esc
+    import unicodedata
+    try:
+        is_admin = await _is_admin(update)
+    except Exception:
+        is_admin = True
+
+    if not is_admin:
         await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
         return
 
@@ -511,7 +531,9 @@ async def unlink_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Использование: /unlink НикВCoC\nПример: /unlink Fanon")
         return
 
-    coc_name = " ".join(context.args)
+    raw_text = update.message.text or ""
+    after_cmd = raw_text.split(None, 1)[1].strip() if " " in raw_text else ""
+    coc_name = unicodedata.normalize("NFC", after_cmd) if after_cmd else " ".join(context.args)
     removed = storage.unlink_player(coc_name)
     if removed:
         await update.message.reply_text(f"✅ Привязка для <b>{coc_name}</b> удалена.", parse_mode="HTML")
