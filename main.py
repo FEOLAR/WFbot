@@ -479,66 +479,96 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /link @tg_username Ник в CoC"""
     from html import escape as _esc
     import unicodedata
+
+    msg = update.message
+    if not msg:
+        return
+
     try:
-        is_admin = await _is_admin(update)
-    except Exception:
-        is_admin = True  # в ЛС всегда разрешаем
+        try:
+            is_admin = await _is_admin(update)
+        except Exception:
+            is_admin = True  # при ошибке проверки — разрешаем (ЛС/ошибка API)
 
-    if not is_admin:
-        await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
-        return
+        if not is_admin:
+            await msg.reply_text("❌ Только администраторы могут использовать эту команду.")
+            return
 
-    if len(context.args) < 2:
-        await update.message.reply_text(
-            "Использование: /link @telegram НикВCoC\n"
-            "Примеры:\n"
-            "  /link @feolar Fanon\n"
-            "  /link @feolar ɢʀᴇꜱʜɴɪᴋ⇝ ™\n\n"
-            "Один @telegram можно привязать к нескольким никам."
+        # Парсим полный текст — context.args может терять спецсимволы и mentions
+        raw = (msg.text or "").strip()
+        # Убираем команду (/link или /link@botname)
+        body = raw.split(None, 1)[1].strip() if len(raw.split(None, 1)) > 1 else ""
+
+        if not body:
+            await msg.reply_text(
+                "Использование: /link @telegram НикВCoC\n"
+                "Примеры:\n"
+                "  /link @feolar Fanon\n"
+                "  /link @feolar ɢʀᴇꜱʜɴɪᴋ⇝ ™\n\n"
+                "Один @telegram можно привязать к нескольким никам."
+            )
+            return
+
+        # body = "@username ник" — разбиваем на части
+        parts = body.split(None, 1)
+        if len(parts) < 2:
+            await msg.reply_text(
+                "Укажи оба аргумента.\n"
+                "Пример: /link @feolar Fanon"
+            )
+            return
+
+        tg_username = parts[0].lstrip("@")
+        coc_name = unicodedata.normalize("NFC", parts[1].strip())
+
+        storage.link_player(coc_name, tg_username)
+        logger.info(f"Привязка: {coc_name!r} → @{tg_username}")
+        await msg.reply_text(
+            f"✅ <b>{_esc(coc_name)}</b> привязан к @{tg_username}",
+            parse_mode="HTML"
         )
-        return
 
-    tg_username = context.args[0].lstrip("@")
-    # Берём ник из полного текста сообщения чтобы не потерять спецсимволы
-    raw_text = update.message.text or ""
-    after_cmd = raw_text.split(None, 1)[1] if " " in raw_text else ""
-    # after_cmd = "@username ник" — пропускаем первое слово (@username)
-    parts2 = after_cmd.split(None, 1)
-    coc_name_raw = parts2[1].strip() if len(parts2) > 1 else " ".join(context.args[1:])
-    coc_name = unicodedata.normalize("NFC", coc_name_raw)
-
-    storage.link_player(coc_name, tg_username)
-    await update.message.reply_text(
-        f"✅ <b>{_esc(coc_name)}</b> привязан к @{tg_username}",
-        parse_mode="HTML"
-    )
+    except Exception as e:
+        logger.error(f"Ошибка /link: {e}", exc_info=True)
+        await msg.reply_text(f"❌ Ошибка: {e}")
 
 
 async def unlink_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /unlink Ник в CoC"""
     from html import escape as _esc
     import unicodedata
+
+    msg = update.message
+    if not msg:
+        return
+
     try:
-        is_admin = await _is_admin(update)
-    except Exception:
-        is_admin = True
+        try:
+            is_admin = await _is_admin(update)
+        except Exception:
+            is_admin = True
 
-    if not is_admin:
-        await update.message.reply_text("❌ Только администраторы могут использовать эту команду.")
-        return
+        if not is_admin:
+            await msg.reply_text("❌ Только администраторы могут использовать эту команду.")
+            return
 
-    if not context.args:
-        await update.message.reply_text("Использование: /unlink НикВCoC\nПример: /unlink Fanon")
-        return
+        raw = (msg.text or "").strip()
+        body = raw.split(None, 1)[1].strip() if len(raw.split(None, 1)) > 1 else ""
 
-    raw_text = update.message.text or ""
-    after_cmd = raw_text.split(None, 1)[1].strip() if " " in raw_text else ""
-    coc_name = unicodedata.normalize("NFC", after_cmd) if after_cmd else " ".join(context.args)
-    removed = storage.unlink_player(coc_name)
-    if removed:
-        await update.message.reply_text(f"✅ Привязка для <b>{coc_name}</b> удалена.", parse_mode="HTML")
-    else:
-        await update.message.reply_text(f"⚠️ Привязка для <b>{coc_name}</b> не найдена.", parse_mode="HTML")
+        if not body:
+            await msg.reply_text("Использование: /unlink НикВCoC\nПример: /unlink Fanon")
+            return
+
+        coc_name = unicodedata.normalize("NFC", body)
+        removed = storage.unlink_player(coc_name)
+        if removed:
+            await msg.reply_text(f"✅ Привязка для <b>{_esc(coc_name)}</b> удалена.", parse_mode="HTML")
+        else:
+            await msg.reply_text(f"⚠️ Привязка для <b>{_esc(coc_name)}</b> не найдена.", parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Ошибка /unlink: {e}", exc_info=True)
+        await msg.reply_text(f"❌ Ошибка: {e}")
 
 
 async def links_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
