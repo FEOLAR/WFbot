@@ -1,8 +1,24 @@
 import json
 import os
 
-WAR_HISTORY_FILE = "war_history.json"
-CWL_HISTORY_FILE = "cwl_history.json"
+import pathlib
+
+def _data_dir() -> pathlib.Path:
+    p = pathlib.Path("/data")
+    try:
+        p.mkdir(exist_ok=True)
+        (p / ".writable_check").touch()
+        (p / ".writable_check").unlink()
+        return p
+    except OSError:
+        local = pathlib.Path("data")
+        local.mkdir(exist_ok=True)
+        return local
+
+_DIR = _data_dir()
+
+WAR_HISTORY_FILE = str(_DIR / "war_history.json")
+CWL_HISTORY_FILE = str(_DIR / "cwl_history.json")
 
 MAX_WAR_ENTRIES = 5
 MAX_CWL_SEASONS = 2

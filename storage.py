@@ -2,9 +2,25 @@ import json
 import os
 from datetime import datetime
 
-DATA_FILE        = "players.json"
-LINKS_FILE       = "links.json"
-NOTIFY_CHAT_FILE = "notify_chat.json"
+import pathlib
+
+def _data_dir() -> pathlib.Path:
+    p = pathlib.Path("/data")
+    try:
+        p.mkdir(exist_ok=True)
+        (p / ".writable_check").touch()
+        (p / ".writable_check").unlink()
+        return p
+    except OSError:
+        local = pathlib.Path("data")
+        local.mkdir(exist_ok=True)
+        return local
+
+_DIR = _data_dir()
+
+DATA_FILE        = str(_DIR / "players.json")
+LINKS_FILE       = str(_DIR / "links.json")
+NOTIFY_CHAT_FILE = str(_DIR / "notify_chat.json")
 
 
 # ── Internal helpers ────────────────────────────────────────────────────────
@@ -176,7 +192,7 @@ def get_notify_chat() -> int | None:
 
 # ── War state persistence (for transition detection across restarts) ───────────
 
-WAR_STATE_FILE = "war_state.json"
+WAR_STATE_FILE = str(_DIR / "war_state.json")
 
 
 def save_war_state(state: str):
@@ -196,7 +212,7 @@ def get_war_state() -> str | None:
 
 # ── CWL state persistence ─────────────────────────────────────────────────────
 
-CWL_STATE_FILE = "cwl_state.json"
+CWL_STATE_FILE = str(_DIR / "cwl_state.json")
 
 
 def save_cwl_state(state: str, round_count: int):
