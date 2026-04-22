@@ -102,14 +102,14 @@ def get_player_by_telegram(telegram_id: int) -> dict | None:
 def link_player(coc_name: str, tg_username: str):
     """Link a CoC player name to a Telegram username (admin action)."""
     links = _load_links()
-    links[coc__norm(name)] = tg_username.lstrip("@")
+    links[_norm(coc_name)] = tg_username.lstrip("@")
     _save_links(links)
 
 
 def unlink_player(coc_name: str) -> bool:
     """Remove link for a CoC player. Returns True if it existed."""
     links = _load_links()
-    key = coc__norm(name)
+    key = _norm(coc_name)
     if key in links:
         del links[key]
         _save_links(links)
