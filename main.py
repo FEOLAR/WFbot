@@ -4,6 +4,7 @@ except ImportError:
     pass
 
 import os
+import re as _re
 
 # Fallback: load tokens from config.py if env vars not set
 try:
@@ -82,22 +83,106 @@ ROLE_ORDER = {
 coc_client = coc.Client()
 
 
+def _extract_ip_from_error(err_str: str) -> str | None:
+    """Извлекаем реальный исходящий IP из текста ошибки CoC."""
+    m = _re.search(r'from IP (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', err_str)
+    return m.group(1) if m else None
+
+
+# Множество всех известных исходящих IP этого сервера
+_known_server_ips: set[str] = set()
+
+_COC_DEV_URL = "https://developer.clashofclans.com/api"
+_KEY_NAME     = "warfil_bot"
+
+
+async def _rekey_coc(new_ip: str | None = None) -> bool:
+    """Пересоздаём CoC API ключ, включая ВСЕ известные IP сервера.
+
+    Работает напрямую через developer.clashofclans.com — не зависит от того,
+    какой IP coc.py «видит» через JWT.
+    Возвращает True при успехе, False при ошибке.
+    """
+    import aiohttp as _aio
+    if not (COC_EMAIL and COC_PASSWORD):
+        return False
+
+    if new_ip:
+        _known_server_ips.add(new_ip)
+
+    # Используем все накопленные IP напрямую — CoC не поддерживает CIDR нотацию
+    cidr_ranges: list[str] = sorted(_known_server_ips)
+    if not cidr_ranges:
+        cidr_ranges = ["127.0.0.1"]   # заглушка, не должна сработать
+
+    logger.info(f"Пересоздаю CoC ключ с cidrRanges={cidr_ranges}")
+
+    try:
+        async with _aio.ClientSession() as s:
+            # 1. Логин на developer site
+            r = await s.post(f"{_COC_DEV_URL}/login",
+                             json={"email": COC_EMAIL, "password": COC_PASSWORD})
+            if r.status != 200:
+                logger.error(f"Логин на developer site не удался: {r.status}")
+                return False
+
+            # 2. Получаем список ключей
+            r = await s.post(f"{_COC_DEV_URL}/apikey/list")
+            keys = (await r.json()).get("keys", [])
+
+            # 3. Удаляем ВСЕ наши старые ключи (и от coc.py, и наш warfil_bot)
+            OUR_NAMES = {_KEY_NAME, "Created with coc.py Client"}
+            for key in keys:
+                if key.get("name") in OUR_NAMES:
+                    await s.post(f"{_COC_DEV_URL}/apikey/revoke",
+                                 json={"id": key["id"]})
+                    logger.info(f"Удалён ключ '{key['name']}' id={key['id']} cidr={key.get('cidrRanges')}")
+
+            # 4. Создаём один новый ключ со всеми нужными CIDR
+            payload = {
+                "name"       : _KEY_NAME,
+                "description": f"Warfil bot — updated {__import__('datetime').datetime.now():%Y-%m-%d %H:%M}",
+                "cidrRanges" : cidr_ranges,
+                "scopes"     : ["clash"],
+            }
+            r = await s.post(f"{_COC_DEV_URL}/apikey/create", json=payload)
+            if r.status != 200:
+                body = await r.text()
+                logger.error(f"Создание ключа не удалось: {r.status} — {body}")
+                return False
+
+            key_data = await r.json()
+            new_token = key_data["key"]["key"]
+            logger.info(f"Новый ключ создан ✓ cidr={cidr_ranges}")
+
+            # 5. Активируем новый токен через login_with_tokens —
+            #    НЕ вызываем login(email,pass) чтобы coc.py не удалил наш CIDR ключ!
+            await coc_client.login_with_tokens(new_token)
+            logger.info("coc_client инициализирован через новый токен")
+            return True
+    except Exception as exc:
+        logger.error(f"_rekey_coc error: {exc}", exc_info=True)
+        return False
+
+
 async def _coc_safe(fn, *args, **kwargs):
-    """Call a coc API function; on IP-Forbidden error re-login and retry once."""
+    """Call a coc API function; on IP-Forbidden error update key CIDR and retry."""
     try:
         return await fn(*args, **kwargs)
     except (coc.errors.Forbidden, coc.errors.HTTPException) as e:
         err_str = str(e)
-        if ("invalidIp" in err_str or "403" in err_str) and COC_EMAIL and COC_PASSWORD:
-            logger.warning(f"CoC IP ошибка ({err_str[:80]}) — перелогиниваюсь...")
+        if "invalidIp" in err_str and COC_EMAIL and COC_PASSWORD:
+            bad_ip = _extract_ip_from_error(err_str)
+            logger.warning(f"CoC IP ошибка (IP={bad_ip}) — обновляю ключ с новым CIDR диапазоном...")
             try:
-                # login() reopens the session internally — не вызываем close() отдельно
-                await coc_client.login(COC_EMAIL, COC_PASSWORD)
-                logger.info("Перелогин выполнен, повторяю запрос...")
-                return await fn(*args, **kwargs)
+                ok = await _rekey_coc(new_ip=bad_ip)
+                if ok:
+                    logger.info("Ключ обновлён, повторяю запрос...")
+                    return await fn(*args, **kwargs)
+                else:
+                    logger.error("Не удалось обновить ключ")
             except Exception as re_err:
-                logger.error(f"Перелогин не удался: {re_err}", exc_info=True)
-                raise
+                logger.error(f"_rekey_coc не удался: {re_err}", exc_info=True)
         raise
 
 
@@ -1272,13 +1357,45 @@ async def listchats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
+async def _detect_real_outbound_ip() -> str | None:
+    """Определяем реальный исходящий IP сервера через внешний сервис."""
+    import aiohttp
+    for url in ("https://api.ipify.org", "https://checkip.amazonaws.com", "https://icanhazip.com"):
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
+                    ip = (await r.text()).strip()
+                    if _re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
+                        return ip
+        except Exception:
+            continue
+    return None
+
+
 async def post_init(application):
     if COC_API_KEY:
         await coc_client.login_with_tokens(COC_API_KEY)
         logger.info("CoC клиент авторизован через API ключ")
     else:
-        await coc_client.login(COC_EMAIL, COC_PASSWORD)
-        logger.info("CoC клиент авторизован через email/пароль")
+        # 1) Определяем реальный исходящий IP сервера
+        real_ip = await _detect_real_outbound_ip()
+        if real_ip:
+            logger.info(f"Реальный исходящий IP сервера: {real_ip}")
+            _known_server_ips.add(real_ip)
+        else:
+            logger.warning("Не удалось определить исходящий IP")
+
+        # 2) Создаём/обновляем ключ с CIDR диапазоном (/24) для каждого известного IP
+        #    _rekey_coc делает login_with_tokens внутри — НЕ вызываем coc_client.login()
+        #    чтобы coc.py не удалил наш CIDR-ключ (coc.py умеет только точное IP сравнение)
+        ok = await _rekey_coc(new_ip=real_ip)
+        if ok:
+            logger.info("CoC клиент авторизован через CIDR-ключ (email/пароль)")
+        else:
+            # Fallback: обычный логин через coc.py
+            logger.warning("_rekey_coc не удался — обычный логин через coc.py")
+            await coc_client.login(COC_EMAIL, COC_PASSWORD)
+            logger.info("CoC клиент авторизован через email/пароль (fallback)")
 
     asyncio.create_task(war_auto_broadcast(application.bot))
     asyncio.create_task(war_state_monitor(application.bot))
