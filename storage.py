@@ -234,3 +234,23 @@ def get_cwl_state() -> dict | None:
             return json.load(f)
     except (json.JSONDecodeError, KeyError):
         return None
+
+
+# ── Capital Raid state persistence ────────────────────────────────────────────
+
+RAID_STATE_FILE = str(_DIR / "raid_state.json")
+
+
+def save_raid_state(state: str, start_iso: str = ""):
+    with open(RAID_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"state": state, "start_iso": start_iso}, f)
+
+
+def get_raid_state() -> dict:
+    if not os.path.exists(RAID_STATE_FILE):
+        return {}
+    try:
+        with open(RAID_STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, KeyError):
+        return {}

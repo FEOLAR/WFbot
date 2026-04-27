@@ -852,6 +852,236 @@ async def war_auto_broadcast(bot):
             logger.warning(f"war_auto_broadcast: {e}")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  CAPITAL RAIDS  —  рейды столицы клана
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def _get_current_raid():
+    """Fetch the most recent raid log entry. Returns None if no raids found."""
+    try:
+        raid_log = await _coc_safe(coc_client.get_raid_log, CLAN_TAG, limit=1)
+        async for entry in raid_log:
+            return entry
+    except Exception:
+        pass
+    return None
+
+
+async def build_raid_message() -> tuple[str, bool]:
+    """Build capital raid status message. Returns (text, keep_updating)."""
+    raid = await _get_current_raid()
+
+    if raid is None:
+        return "🏛 Нет данных о рейдах столицы.", False
+
+    state = getattr(raid, "state", "ended")
+    if state != "ongoing":
+        return "🏛 Рейды столицы сейчас не идут.", False
+
+    total_loot = getattr(raid, "total_loot", 0) or 0
+    members = list(getattr(raid, "members", None) or [])
+    attack_count = getattr(raid, "attack_count", 0) or 0
+    districts_destroyed = getattr(raid, "enemy_districts_destroyed", 0) or 0
+
+    time_str = ""
+    if getattr(raid, "end_time", None):
+        from datetime import datetime as _dt
+        diff = raid.end_time.time - _dt.utcnow()
+        total_sec = max(int(diff.total_seconds()), 0)
+        h, m = divmod(total_sec // 60, 60)
+        time_str = f"⏱ До конца: <b>{h}ч {m}мин</b>\n"
+
+    start_str = ""
+    if getattr(raid, "start_time", None):
+        start_str = f"🗓 Начались: <b>{raid.start_time.time.strftime('%d.%m')}</b>\n"
+
+    # Sort members by loot descending
+    members_sorted = sorted(
+        members,
+        key=lambda m: getattr(m, "capital_resources_looted", 0) or 0,
+        reverse=True,
+    )
+
+    tg_map = storage.get_tg_username_map()
+
+    lines = [
+        "🏛 <b>РЕЙДЫ СТОЛИЦЫ ИДУТ</b>",
+        fmt.DIV,
+        start_str + time_str +
+        f"💰 Собрано: <b>{total_loot:,}".replace(",", " ") + " золота</b>\n"
+        f"⚔️ Атак: <b>{attack_count}</b>  ·  🏰 Районов взято: <b>{districts_destroyed}</b>",
+    ]
+
+    if members_sorted:
+        lines.append(f"\n👥 <b>Участников: {len(members_sorted)}</b>")
+        for i, m in enumerate(members_sorted[:10], 1):
+            name = getattr(m, "name", "?")
+            loot = getattr(m, "capital_resources_looted", 0) or 0
+            atks = getattr(m, "attacks", 0) or 0
+            atk_limit = (getattr(m, "attack_limit", 5) or 5) + (getattr(m, "bonus_attack_limit", 0) or 0)
+            tg = tg_map.get(_norm_name(name))
+            tag = f" (@{tg})" if tg else ""
+            lines.append(f"  {i}. {name}{tag} — {loot:,}💎 · {atks}/{atk_limit}atk".replace(",", " "))
+
+    lines.append(fmt.footer())
+    return "\n".join(lines), True
+
+
+async def send_raid_start(bot, chat_id: int, raid):
+    """Notification when raid weekend begins."""
+    start_str = ""
+    if getattr(raid, "end_time", None):
+        start_str = f"⏳ Закончатся: {raid.end_time.time.strftime('%d.%m в %H:%M')} (UTC)\n"
+
+    text = (
+        f"🏛 <b>РЕЙДЫ СТОЛИЦЫ НАЧАЛИСЬ!</b>\n"
+        f"{fmt.DIV}\n\n"
+        f"{start_str}\n"
+        f"{fmt.DIVs}\n"
+        f"💎 Время грабить вражескую столицу!\n"
+        f"▸ У каждого минимум <b>5 атак</b>\n"
+        f"▸ Сначала добиваем незавершённые районы\n"
+        f"▸ Не теряем ни одной атаки!\n\n"
+        f"<b>Warfil — в атаку! 💪</b>"
+    )
+    await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+
+
+async def send_raid_end(bot, chat_id: int, raid):
+    """Notification when raid weekend ends with summary."""
+    total_loot = getattr(raid, "total_loot", 0) or 0
+    off_reward = getattr(raid, "offensive_reward", 0) or 0
+    def_reward = getattr(raid, "defensive_reward", 0) or 0
+    attack_count = getattr(raid, "attack_count", 0) or 0
+    districts = getattr(raid, "enemy_districts_destroyed", 0) or 0
+    members = list(getattr(raid, "members", None) or [])
+
+    members_sorted = sorted(
+        members,
+        key=lambda m: getattr(m, "capital_resources_looted", 0) or 0,
+        reverse=True,
+    )
+    tg_map = storage.get_tg_username_map()
+
+    # Кто не атаковал вообще
+    try:
+        clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
+        clan_names = {_norm_name(m.name) for m in (clan.members or [])}
+        raided_names = {_norm_name(getattr(m, "name", "")) for m in members}
+        missed_names = clan_names - raided_names
+    except Exception:
+        missed_names = set()
+
+    lines = [
+        "🏁 <b>РЕЙДЫ СТОЛИЦЫ ЗАВЕРШЕНЫ</b>",
+        fmt.DIV,
+        f"💰 Собрано: <b>{total_loot:,}".replace(",", " ") + " золота</b>",
+        f"⚔️ Атак: <b>{attack_count}</b>  ·  🏰 Районов взято: <b>{districts}</b>",
+        f"🎁 Награда: <b>{off_reward}</b> атак. / <b>{def_reward}</b> защ.",
+    ]
+
+    if members_sorted:
+        lines.append(f"\n✅ <b>Атаковали ({len(members_sorted)}):</b>")
+        for m in members_sorted:
+            name = getattr(m, "name", "?")
+            loot = getattr(m, "capital_resources_looted", 0) or 0
+            atks = getattr(m, "attacks", 0) or 0
+            atk_limit = (getattr(m, "attack_limit", 5) or 5) + (getattr(m, "bonus_attack_limit", 0) or 0)
+            tg = tg_map.get(_norm_name(name))
+            lines.append(fmt.member_line(f"{name} — {loot:,}💎 · {atks}/{atk_limit}atk".replace(",", " "), tg=tg))
+        lines.append(f"\n🔥 <i>Отличная работа, участники!</i>")
+
+    if missed_names:
+        lines.append(f"\n❌ <b>Не участвовали ({len(missed_names)}):</b>")
+        for norm in sorted(missed_names):
+            tg = tg_map.get(norm)
+            display = norm
+            for m in members_sorted:
+                if _norm_name(getattr(m, "name", "")) == norm:
+                    display = m.name
+                    break
+            lines.append(fmt.member_line(display, tg=tg))
+        lines.append(f"\n{fmt.warn('<b>Без рейда — кандидаты на проверку!</b>')}")
+
+    lines.append(fmt.footer())
+    await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="HTML")
+
+
+async def raid_state_monitor(bot):
+    """Poll capital raid state every 5 min; notify on start/end transitions."""
+    saved = storage.get_raid_state()
+    prev_state = saved.get("state", "ended")
+    prev_start = saved.get("start_iso", "")
+
+    while True:
+        await asyncio.sleep(300)  # 5 минут
+        try:
+            chat_ids = storage.get_notify_chats()
+            if not chat_ids:
+                continue
+
+            raid = await _get_current_raid()
+            if raid is None:
+                continue
+
+            current_state = getattr(raid, "state", "ended")
+            current_start = ""
+            if getattr(raid, "start_time", None):
+                current_start = raid.start_time.time.isoformat()
+
+            # Определяем переход состояния по state и start_time (чтобы не слать повторно)
+            new_raid_started = (
+                current_state == "ongoing"
+                and (prev_state == "ended" or current_start != prev_start)
+            )
+            raid_ended = (prev_state == "ongoing" and current_state == "ended")
+
+            if new_raid_started:
+                for chat_id in chat_ids:
+                    try:
+                        await send_raid_start(bot, chat_id, raid)
+                    except Exception as e:
+                        logger.warning(f"raid_monitor: ошибка отправки в {chat_id}: {e}")
+
+            elif raid_ended:
+                for chat_id in chat_ids:
+                    try:
+                        await send_raid_end(bot, chat_id, raid)
+                    except Exception as e:
+                        logger.warning(f"raid_monitor: ошибка отправки в {chat_id}: {e}")
+
+            if current_state != prev_state or current_start != prev_start:
+                storage.save_raid_state(current_state, current_start)
+                prev_state = current_state
+                prev_start = current_start
+
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"raid_state_monitor: {e}")
+
+
+async def raid_auto_broadcast(bot):
+    """Send raid status every 4 hours while raid is active."""
+    while True:
+        await asyncio.sleep(14400)  # 4 часа
+        try:
+            chat_ids = storage.get_notify_chats()
+            if not chat_ids:
+                continue
+            text, keep_going = await build_raid_message()
+            if keep_going:
+                for chat_id in chat_ids:
+                    try:
+                        await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+                    except Exception as e:
+                        logger.warning(f"raid_auto_broadcast: ошибка отправки в {chat_id}: {e}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"raid_auto_broadcast: {e}")
+
+
 def _is_feolar(update: Update) -> bool:
     user = update.effective_user
     return user is not None and (user.username or "").lower() == WAR_NOTIFY_USERNAME.lower()
@@ -1292,6 +1522,32 @@ async def cwl_state_monitor(bot):
             logger.warning(f"cwl_state_monitor: {e}")
 
 
+async def cwl_auto_broadcast(bot):
+    """Send CWL status every 2 hours during active CWL round (same as war_auto_broadcast)."""
+    while True:
+        await asyncio.sleep(7200)  # 2 часа
+        try:
+            chat_ids = storage.get_notify_chats()
+            if not chat_ids:
+                continue
+            text, keep_going = await build_cwl_message()
+            if keep_going:
+                for chat_id in chat_ids:
+                    try:
+                        await bot.send_message(
+                            chat_id=chat_id,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=KV_BUTTONS,
+                        )
+                    except Exception as e:
+                        logger.warning(f"cwl_auto_broadcast: ошибка отправки в {chat_id}: {e}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"cwl_auto_broadcast: {e}")
+
+
 async def cwl_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⏳ Загружаю данные Лиги войн...")
     try:
@@ -1326,6 +1582,47 @@ async def testcwlend_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text("⚠️ Клан не в ЛВК или нет активного раунда.")
             return
         await send_cwl_end(context.bot, update.effective_chat.id, war, round_num)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+async def raid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show current capital raid status."""
+    msg = await update.message.reply_text("⏳ Загружаю данные рейдов столицы...")
+    try:
+        text, _ = await build_raid_message()
+        await msg.edit_text(text, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Ошибка /raid: {e}")
+        await msg.edit_text("❌ Не удалось загрузить данные рейдов. Попробуй позже.")
+
+
+async def testraidstart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Test: send a raid start notification to current chat."""
+    if not _is_feolar(update):
+        await update.message.reply_text("❌ Нет доступа.")
+        return
+    try:
+        raid = await _get_current_raid()
+        if raid is None:
+            await update.message.reply_text("⚠️ Нет данных о рейдах.")
+            return
+        await send_raid_start(context.bot, update.effective_chat.id, raid)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+async def testraidend_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Test: send a raid end notification to current chat."""
+    if not _is_feolar(update):
+        await update.message.reply_text("❌ Нет доступа.")
+        return
+    try:
+        raid = await _get_current_raid()
+        if raid is None:
+            await update.message.reply_text("⚠️ Нет данных о рейдах.")
+            return
+        await send_raid_end(context.bot, update.effective_chat.id, raid)
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
@@ -1468,7 +1765,10 @@ async def post_init(application):
     asyncio.create_task(war_auto_broadcast(application.bot))
     asyncio.create_task(war_state_monitor(application.bot))
     asyncio.create_task(cwl_state_monitor(application.bot))
-    logger.info("Авто-рассылка войны и ЛВК запущена")
+    asyncio.create_task(cwl_auto_broadcast(application.bot))
+    asyncio.create_task(raid_state_monitor(application.bot))
+    asyncio.create_task(raid_auto_broadcast(application.bot))
+    logger.info("Авто-рассылка войны, ЛВК и рейдов запущена")
 
     # Register bot commands (shown in Telegram command menu)
     await application.bot.set_my_commands([
@@ -1476,6 +1776,7 @@ async def post_init(application):
         BotCommand("team",     "📋 Список участников клана"),
         BotCommand("kv",       "⚔️ Атаки в клановой войне"),
         BotCommand("cwl",      "🏆 Статус Лиги войн клана"),
+        BotCommand("raid",     "🏛 Рейды столицы клана"),
         BotCommand("statistic","📊 Статистика клана (Excel)"),
         BotCommand("card",     "🎨 Карточка клана"),
         BotCommand("register", "🔗 Привязать свой аккаунт CoC"),
@@ -1543,9 +1844,12 @@ def main():
     app.add_handler(CommandHandler("teststart", teststart_command))
     app.add_handler(CommandHandler("testend", testend_command))
     app.add_handler(CommandHandler("cwl", cwl_command))
+    app.add_handler(CommandHandler("raid", raid_command))
     app.add_handler(CommandHandler("statistic", statistic_command))
     app.add_handler(CommandHandler("testcwlstart", testcwlstart_command))
     app.add_handler(CommandHandler("testcwlend", testcwlend_command))
+    app.add_handler(CommandHandler("testraidstart", testraidstart_command))
+    app.add_handler(CommandHandler("testraidend", testraidend_command))
     app.add_handler(CommandHandler("card", card_command))
     app.add_handler(CommandHandler("addchat", addchat_command))
     app.add_handler(CommandHandler("removechat", removechat_command))
