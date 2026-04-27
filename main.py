@@ -49,7 +49,10 @@ from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     ReplyKeyboardMarkup, KeyboardButton, BotCommand, MenuButtonCommands
 )
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    filters, ContextTypes, TypeHandler, ApplicationHandlerStop,
+)
 import storage
 import stats_storage
 import excel_builder
@@ -72,6 +75,11 @@ CLAN_TAG       = "#2R02GGRUJ"
 CLAN_WEBSITE   = "https://www.warfilcoc.ru"
 TG_GROUP_LINK  = "https://t.me/warfil_clan"   # ← замени на реальную ссылку беседы
 WAR_NOTIFY_USERNAME = "feolar"                 # username получателя авто-рассылки войны
+
+# ── Защита доступа: ID беседы клана ──────────────────────────────────────────
+# Заполни после первого /addchat — возьми ID из /listchats.
+# Если 0 — бот автоматически возьмёт первый зарегистрированный чат из /addchat.
+CLAN_GROUP_CHAT_ID: int = 0
 
 ROLE_ORDER = {
     "leader": 0,
@@ -473,6 +481,73 @@ async def _is_admin(update: Update) -> bool:
         return True
     member = await chat.get_member(update.effective_user.id)
     return member.status in ("administrator", "creator")
+
+
+# ── Защита доступа ────────────────────────────────────────────────────────────
+
+async def _clan_group_id(bot) -> int | None:
+    """Return the registered clan group chat ID (constant or first notify chat)."""
+    if CLAN_GROUP_CHAT_ID:
+        return CLAN_GROUP_CHAT_ID
+    chats = storage.get_notify_chats()
+    # Return only if it's actually a group (negative ID in Telegram)
+    for cid in chats:
+        if cid < 0:
+            return cid
+    return None
+
+
+async def clan_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Security gate — registered in group=-1, runs before every command/message.
+
+    Rules:
+    • Group / supergroup: only the registered clan group is served, all others are silently ignored.
+    • Private chat: only users who are members of the clan group may use the bot;
+      others receive a rejection message with the clan website link.
+    • Bot admin (@feolar) is always allowed everywhere.
+    """
+    if not update.effective_chat or not update.effective_user:
+        return
+
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # Bot admin bypass — always allow
+    if (user.username or "").lower() == WAR_NOTIFY_USERNAME.lower():
+        return
+
+    gid = await _clan_group_id(context.bot)
+
+    # ── Группы: только беседа клана ──────────────────────────────────────────
+    if chat.type in ("group", "supergroup"):
+        if gid and chat.id != gid:
+            raise ApplicationHandlerStop  # чужая беседа — молча игнорируем
+        return  # своя беседа — разрешаем
+
+    # ── Личные сообщения: проверяем членство в беседе клана ──────────────────
+    if chat.type == "private":
+        if not gid:
+            return  # защита ещё не настроена (addchat не запускали)
+
+        allowed = False
+        try:
+            member = await context.bot.get_chat_member(gid, user.id)
+            allowed = member.status not in ("left", "kicked", "banned")
+        except Exception:
+            allowed = False  # не удалось проверить → блокируем
+
+        if not allowed:
+            if update.message:
+                await update.message.reply_text(
+                    "👋 <b>Вы не являетесь участником беседы клана Warfil.</b>\n\n"
+                    "Для вступления в клан перейдите по ссылке:\n"
+                    f"🌐 {CLAN_WEBSITE}\n\n"
+                    "и подайте анкету на вступление в клан.",
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+            raise ApplicationHandlerStop
 
 
 async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1831,6 +1906,9 @@ def main():
         .post_shutdown(post_shutdown)
         .build()
     )
+
+    # Защита: проверяется ДО всех команд
+    app.add_handler(TypeHandler(Update, clan_guard), group=-1)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
