@@ -1,0 +1,149 @@
+28/04/26 20:39:24
+2026-04-28 17:39:24,712 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+28/04/26 20:39:24
+client_session: <aiohttp.client.ClientSession object at 0x7f378f76f550>
+
+28/04/26 20:39:24
+2026-04-28 17:39:24,307 - asyncio - ERROR - Unclosed client session
+
+28/04/26 20:39:19
+2026-04-28 17:39:19,677 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/editMessageText "HTTP/1.1 200 OK"
+
+28/04/26 20:39:19
+coc.errors.Forbidden: accessDenied.invalidIp (status code: 403): Invalid authorization: API key does not allow access from IP 84.201.183.13
+
+28/04/26 20:39:19
+    raise Forbidden(response, data)
+
+28/04/26 20:39:19
+  File "/app/venv/lib/python3.11/site-packages/coc/http.py", line 371, in request
+
+28/04/26 20:39:19
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 20:39:19
+    data = await self.http.get_clan(tag,
+
+28/04/26 20:39:19
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 610, in get_clan
+
+28/04/26 20:39:19
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 20:39:19
+    return await fn(*args, **kwargs)
+
+28/04/26 20:39:19
+  File "/app/main.py", line 227, in _coc_safe
+
+28/04/26 20:39:19
+    raise last_exc
+
+28/04/26 20:39:19
+  File "/app/main.py", line 252, in _coc_safe
+
+28/04/26 20:39:19
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 20:39:19
+    clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
+
+28/04/26 20:39:19
+  File "/app/main.py", line 483, in team_command
+
+28/04/26 20:39:19
+Traceback (most recent call last):
+
+28/04/26 20:39:19
+2026-04-28 17:39:19,614 - __main__ - ERROR - Ошибка при получении данных клана: accessDenied.invalidIp (status code: 403): Invalid authorization: API key does not allow access from IP 84.201.183.13
+
+28/04/26 20:39:19
+2026-04-28 17:39:19,613 - __main__ - INFO - coc_client инициализирован через новый токен
+
+28/04/26 20:39:19
+2026-04-28 17:39:19,582 - __main__ - INFO - Новый ключ создан ✓ cidr=['51.250.53.5', '84.201.183.10', '84.201.183.13', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:19
+2026-04-28 17:39:19,185 - __main__ - INFO - Удалён ключ 'warfil_bot' id=5eb0cad1-696b-4fa6-9721-5d2436aa3faa cidr=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:18
+2026-04-28 17:39:18,129 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['51.250.53.5', '84.201.183.10', '84.201.183.13', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:18
+2026-04-28 17:39:18,128 - __main__ - WARNING - CoC IP ошибка попытка 3/3 (IP=84.201.183.13) — обновляю ключ...
+
+28/04/26 20:39:18
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 84.201.183.13', 'status_code': 403, 'timestamp': 1777397958.128505, '_response_retry': 600}
+
+28/04/26 20:39:18
+<CIMultiDictProxy('Date': 'Tue, 28 Apr 2026 17:39:18 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+28/04/26 20:39:18
+2026-04-28 17:39:18,128 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+28/04/26 20:39:17
+2026-04-28 17:39:17,745 - __main__ - INFO - coc_client инициализирован через новый токен
+
+28/04/26 20:39:17
+2026-04-28 17:39:17,717 - __main__ - INFO - Новый ключ создан ✓ cidr=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:17
+2026-04-28 17:39:17,390 - __main__ - INFO - Удалён ключ 'warfil_bot' id=27857cb6-fc34-4188-b4c5-47ac7c3eaae1 cidr=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:16
+2026-04-28 17:39:16,712 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:16
+2026-04-28 17:39:16,711 - __main__ - WARNING - CoC IP ошибка попытка 2/3 (IP=178.154.236.81) — обновляю ключ...
+
+28/04/26 20:39:16
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.81', 'status_code': 403, 'timestamp': 1777397956.711577, '_response_retry': 600}
+
+28/04/26 20:39:16
+<CIMultiDictProxy('Date': 'Tue, 28 Apr 2026 17:39:16 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+28/04/26 20:39:16
+2026-04-28 17:39:16,711 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+28/04/26 20:39:16
+2026-04-28 17:39:16,292 - __main__ - INFO - coc_client инициализирован через новый токен
+
+28/04/26 20:39:16
+2026-04-28 17:39:16,253 - __main__ - INFO - Новый ключ создан ✓ cidr=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:16
+2026-04-28 17:39:16,084 - __main__ - INFO - Удалён ключ 'warfil_bot' id=3516ac3e-0c9c-4287-a840-e6992a72c108 cidr=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:15
+2026-04-28 17:39:15,237 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['51.250.53.2', '51.250.53.5', '84.201.183.10', '84.201.183.15', '84.201.183.3', '84.201.183.43', '84.201.183.52', '84.201.183.55', '84.201.183.57', '84.201.183.6']
+
+28/04/26 20:39:15
+2026-04-28 17:39:15,237 - __main__ - WARNING - CoC IP ошибка попытка 1/3 (IP=51.250.124.5) — обновляю ключ...
+
+28/04/26 20:39:15
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 51.250.124.5', 'status_code': 403, 'timestamp': 1777397955.237162, '_response_retry': 600}
+
+28/04/26 20:39:15
+<CIMultiDictProxy('Date': 'Tue, 28 Apr 2026 17:39:15 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+28/04/26 20:39:15
+2026-04-28 17:39:15,237 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+28/04/26 20:39:14
+2026-04-28 17:39:14,826 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+28/04/26 20:39:14
+2026-04-28 17:39:14,658 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+28/04/26 20:39:14
+client_session: <aiohttp.client.ClientSession object at 0x7f378f54c4d0>
+
+28/04/26 20:39:14
+2026-04-28 17:39:14,465 - asyncio - ERROR - Unclosed client session
+
+28/04/26 20:39:12
+client_session: <aiohttp.client.ClientSession object at 0x7f37943c0890>
+
+28/04/26 20:39:12
+2026-04-28 17:39:12,537 - asyncio - ERROR - Unclosed client session

@@ -102,36 +102,53 @@ def _extract_ip_from_error(err_str: str) -> str | None:
     return m.group(1) if m else None
 
 
-# Множество всех известных исходящих IP — сохраняется в файл между перезапусками
-_known_server_ips: set[str] = set()
+# IP → unix-timestamp последнего появления (сохраняется между перезапусками)
+_known_server_ips: dict[str, float] = {}
 
 _COC_DEV_URL = "https://developer.clashofclans.com/api"
 _KEY_NAME     = "warfil_bot"
 _KNOWN_IPS_FILE = os.path.join("data", "known_ips.json")
 
 
-def _load_known_ips() -> set[str]:
-    """Загружаем ранее известные IP из файла."""
+def _load_known_ips() -> dict[str, float]:
+    """Загружаем сохранённые IP; поддерживаем старый формат (list) → конвертируем."""
     try:
         os.makedirs("data", exist_ok=True)
         if os.path.exists(_KNOWN_IPS_FILE):
             import json as _json
             with open(_KNOWN_IPS_FILE, "r") as f:
-                return set(_json.load(f))
+                raw = _json.load(f)
+            if isinstance(raw, list):          # старый формат — просто список IP
+                return {ip: 0.0 for ip in raw}
+            if isinstance(raw, dict):
+                return {k: float(v) for k, v in raw.items()}
     except Exception:
         pass
-    return set()
+    return {}
 
 
 def _save_known_ips():
-    """Сохраняем текущий набор известных IP в файл."""
+    """Сохраняем IP с временными метками."""
     try:
         import json as _json
         os.makedirs("data", exist_ok=True)
         with open(_KNOWN_IPS_FILE, "w") as f:
-            _json.dump(sorted(_known_server_ips), f)
+            _json.dump(_known_server_ips, f)
     except Exception as e:
         logger.warning(f"Не удалось сохранить known_ips: {e}")
+
+
+def _register_ip(ip: str):
+    """Регистрируем IP с текущим временем → для выбора 10 самых свежих."""
+    import time as _time
+    _known_server_ips[ip] = _time.time()
+    _save_known_ips()
+
+
+def _get_key_ips() -> list[str]:
+    """Возвращает до 10 самых СВЕЖИХ IP для API-ключа (сортировка по времени, не по алфавиту)."""
+    by_recency = sorted(_known_server_ips, key=lambda ip: _known_server_ips[ip], reverse=True)
+    return by_recency[:10]
 
 
 # Загружаем сразу при старте модуля
@@ -150,11 +167,10 @@ async def _rekey_coc(new_ip: str | None = None) -> bool:
         return False
 
     if new_ip:
-        _known_server_ips.add(new_ip)
-        _save_known_ips()  # сразу сохраняем, чтобы не потерять при следующем рестарте
+        _register_ip(new_ip)  # сохраняем с timestamp сразу в файл
 
-    # CoC developer portal ограничивает 10 IP на ключ — берём последние 10
-    cidr_ranges: list[str] = sorted(_known_server_ips)[-10:]
+    # 10 самых свежих IP (по timestamp, а не по алфавиту)
+    cidr_ranges: list[str] = _get_key_ips()
     if not cidr_ranges:
         cidr_ranges = ["127.0.0.1"]   # заглушка, не должна сработать
 
@@ -214,40 +230,48 @@ def _is_ip_error(e: Exception) -> bool:
 
 
 async def _coc_safe(fn, *args, **kwargs):
-    """Call a coc API function; on IP-Forbidden error update key CIDR and retry (up to 3 times).
+    """Call a coc API function; on IP-Forbidden error update key CIDR and retry.
 
-    Также перехватывает coc.PrivateWarLog когда coc.py неверно оборачивает 403/invalidIp
-    (это происходит для get_league_group).
+    Логика:
+    - Каждая неудача регистрирует новый IP и пересоздаёт ключ (теперь с 10 СВЕЖИХ IP).
+    - После исчерпания попыток пересоздания делается финальный запрос:
+      к тому моменту ключ содержит все недавно встреченные IP.
+    - Также перехватывает coc.PrivateWarLog когда coc.py неверно оборачивает
+      403/invalidIp (это происходит для get_league_group).
     """
-    _MAX_RETRIES = 3
+    _MAX_REKEYS = 4   # сколько раз пересоздаём ключ до финальной попытки
     last_exc: Exception | None = None
 
-    for attempt in range(_MAX_RETRIES):
+    for attempt in range(_MAX_REKEYS + 1):  # +1 = финальная попытка после всех rekey
         try:
             return await fn(*args, **kwargs)
         except (coc.errors.Forbidden, coc.errors.HTTPException, coc.errors.PrivateWarLog) as e:
-            err_str = str(e)
             if not (_is_ip_error(e) and COC_EMAIL and COC_PASSWORD):
                 raise  # не IP-ошибка → пробрасываем как есть
 
-            bad_ip = _extract_ip_from_error(err_str)
+            bad_ip = _extract_ip_from_error(str(e))
+            last_exc = e
+
+            if attempt >= _MAX_REKEYS:
+                # финальная попытка тоже провалилась — сдаёмся
+                logger.error(f"CoC IP ошибка: исчерпаны все {_MAX_REKEYS} пересоздания ключа (последний IP={bad_ip})")
+                if bad_ip:
+                    _register_ip(bad_ip)  # всё равно запоминаем для следующих запросов
+                break
+
             logger.warning(
-                f"CoC IP ошибка попытка {attempt+1}/{_MAX_RETRIES} "
+                f"CoC IP ошибка попытка {attempt+1}/{_MAX_REKEYS} "
                 f"(IP={bad_ip}) — обновляю ключ..."
             )
-            last_exc = e
             try:
-                ok = await _rekey_coc(new_ip=bad_ip)
+                ok = await _rekey_coc(new_ip=bad_ip)   # регистрирует IP + пересоздаёт ключ
                 if not ok:
-                    logger.error("Не удалось пересоздать ключ")
-                    raise
+                    logger.error("Не удалось пересоздать ключ — прекращаю попытки")
+                    break
             except Exception as rekey_err:
-                if rekey_err is e:
-                    raise
                 logger.error(f"_rekey_coc не удался: {rekey_err}", exc_info=True)
-                raise e from None
+                break
 
-    # исчерпали попытки
     if last_exc:
         raise last_exc
 
