@@ -1,0 +1,130 @@
+2026-04-28 14:21:56,848 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+28/04/26 17:21:52
+2026-04-28 14:21:52,564 - __main__ - WARNING - war_state_monitor: Error Occurred: None
+
+28/04/26 17:21:52
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 51.250.124.31', 'status_code': 403, 'timestamp': 1777386112.563912, '_response_retry': 600}
+
+28/04/26 17:21:52
+<CIMultiDictProxy('Date': 'Tue, 28 Apr 2026 14:21:52 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+28/04/26 17:21:52
+2026-04-28 14:21:52,564 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ/currentwar) [403 Forbidden]>
+
+28/04/26 17:21:51
+2026-04-28 14:21:51,556 - __main__ - WARNING - cwl_state_monitor: accessDenied.invalidIp (status code: 403)
+
+28/04/26 17:21:51
+coc.errors.PrivateWarLog: accessDenied.invalidIp (status code: 403)
+
+28/04/26 17:21:51
+    raise PrivateWarLog(exception.response, exception.reason) from exception
+
+28/04/26 17:21:51
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 1084, in get_league_group
+
+28/04/26 17:21:51
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 17:21:51
+    return await fn(*args, **kwargs)
+
+28/04/26 17:21:51
+  File "/app/main.py", line 194, in _coc_safe
+
+28/04/26 17:21:51
+Traceback (most recent call last):
+
+28/04/26 17:21:51
+The above exception was the direct cause of the following exception:
+
+28/04/26 17:21:51
+coc.errors.Forbidden: accessDenied.invalidIp (status code: 403): Invalid authorization: API key does not allow access from IP 51.250.124.31
+
+28/04/26 17:21:51
+    raise Forbidden(response, data)
+
+28/04/26 17:21:51
+  File "/app/venv/lib/python3.11/site-packages/coc/http.py", line 371, in request
+
+28/04/26 17:21:51
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 17:21:51
+    data = await self.http.get_clan_war_league_group(clan_tag, **{**self._defaults, **kwargs})
+
+28/04/26 17:21:51
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 1082, in get_league_group
+
+28/04/26 17:21:51
+Traceback (most recent call last):
+
+28/04/26 17:21:51
+During handling of the above exception, another exception occurred:
+
+28/04/26 17:21:51
+coc.errors.PrivateWarLog: accessDenied.invalidIp (status code: 403)
+
+28/04/26 17:21:51
+    raise PrivateWarLog(exception.response, exception.reason) from exception
+
+28/04/26 17:21:51
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 1084, in get_league_group
+
+28/04/26 17:21:51
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 17:21:51
+    return await fn(*args, **kwargs)
+
+28/04/26 17:21:51
+  File "/app/main.py", line 184, in _coc_safe
+
+28/04/26 17:21:51
+Traceback (most recent call last):
+
+28/04/26 17:21:51
+The above exception was the direct cause of the following exception:
+
+28/04/26 17:21:51
+coc.errors.Forbidden: accessDenied.invalidIp (status code: 403): Invalid authorization: API key does not allow access from IP 51.250.53.1
+
+28/04/26 17:21:51
+    raise Forbidden(response, data)
+
+28/04/26 17:21:51
+  File "/app/venv/lib/python3.11/site-packages/coc/http.py", line 371, in request
+
+28/04/26 17:21:51
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 17:21:51
+    data = await self.http.get_clan_war_league_group(clan_tag, **{**self._defaults, **kwargs})
+
+28/04/26 17:21:51
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 1082, in get_league_group
+
+28/04/26 17:21:51
+Traceback (most recent call last):
+
+28/04/26 17:21:51
+2026-04-28 14:21:51,555 - __main__ - ERROR - _rekey_coc не удался: accessDenied.invalidIp (status code: 403)
+
+28/04/26 17:21:51
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 51.250.124.31', 'status_code': 403, 'timestamp': 1777386111.554727, '_response_retry': 600}
+
+28/04/26 17:21:51
+<CIMultiDictProxy('Date': 'Tue, 28 Apr 2026 14:21:51 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+28/04/26 17:21:51
+2026-04-28 14:21:51,554 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ/currentwar/leaguegroup) [403 Forbidden]>
+
+28/04/26 17:21:51
+2026-04-28 14:21:51,151 - __main__ - INFO - Ключ обновлён, повторяю запрос...
+
+28/04/26 17:21:51
+2026-04-28 14:21:51,150 - __main__ - INFO - coc_client инициализирован через новый токен
+
+28/04/26 17:21:51
+2026-04-28 14:21:51,027 - __main__ - INFO - Новый ключ создан ✓ cidr=['104.167.196.126', '178.154.236.102', '178.154.236.145', '51.250.124.0', '51.250.124.36', '51.250.53.17', '51.250.53.27', '84.201.183.39', '84.201.183.54']

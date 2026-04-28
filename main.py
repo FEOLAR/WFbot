@@ -102,11 +102,40 @@ def _extract_ip_from_error(err_str: str) -> str | None:
     return m.group(1) if m else None
 
 
-# Множество всех известных исходящих IP этого сервера
+# Множество всех известных исходящих IP — сохраняется в файл между перезапусками
 _known_server_ips: set[str] = set()
 
 _COC_DEV_URL = "https://developer.clashofclans.com/api"
 _KEY_NAME     = "warfil_bot"
+_KNOWN_IPS_FILE = os.path.join("data", "known_ips.json")
+
+
+def _load_known_ips() -> set[str]:
+    """Загружаем ранее известные IP из файла."""
+    try:
+        os.makedirs("data", exist_ok=True)
+        if os.path.exists(_KNOWN_IPS_FILE):
+            import json as _json
+            with open(_KNOWN_IPS_FILE, "r") as f:
+                return set(_json.load(f))
+    except Exception:
+        pass
+    return set()
+
+
+def _save_known_ips():
+    """Сохраняем текущий набор известных IP в файл."""
+    try:
+        import json as _json
+        os.makedirs("data", exist_ok=True)
+        with open(_KNOWN_IPS_FILE, "w") as f:
+            _json.dump(sorted(_known_server_ips), f)
+    except Exception as e:
+        logger.warning(f"Не удалось сохранить known_ips: {e}")
+
+
+# Загружаем сразу при старте модуля
+_known_server_ips = _load_known_ips()
 
 
 async def _rekey_coc(new_ip: str | None = None) -> bool:
@@ -122,9 +151,10 @@ async def _rekey_coc(new_ip: str | None = None) -> bool:
 
     if new_ip:
         _known_server_ips.add(new_ip)
+        _save_known_ips()  # сразу сохраняем, чтобы не потерять при следующем рестарте
 
-    # Используем все накопленные IP напрямую — CoC не поддерживает CIDR нотацию
-    cidr_ranges: list[str] = sorted(_known_server_ips)
+    # CoC developer portal ограничивает 10 IP на ключ — берём последние 10
+    cidr_ranges: list[str] = sorted(_known_server_ips)[-10:]
     if not cidr_ranges:
         cidr_ranges = ["127.0.0.1"]   # заглушка, не должна сработать
 
@@ -178,25 +208,48 @@ async def _rekey_coc(new_ip: str | None = None) -> bool:
         return False
 
 
+def _is_ip_error(e: Exception) -> bool:
+    """True если ошибка — это IP-блокировка CoC API, а не реальный PrivateWarLog."""
+    return "invalidIp" in str(e) or "accessDenied.invalidIp" in str(e)
+
+
 async def _coc_safe(fn, *args, **kwargs):
-    """Call a coc API function; on IP-Forbidden error update key CIDR and retry."""
-    try:
-        return await fn(*args, **kwargs)
-    except (coc.errors.Forbidden, coc.errors.HTTPException) as e:
-        err_str = str(e)
-        if "invalidIp" in err_str and COC_EMAIL and COC_PASSWORD:
+    """Call a coc API function; on IP-Forbidden error update key CIDR and retry (up to 3 times).
+
+    Также перехватывает coc.PrivateWarLog когда coc.py неверно оборачивает 403/invalidIp
+    (это происходит для get_league_group).
+    """
+    _MAX_RETRIES = 3
+    last_exc: Exception | None = None
+
+    for attempt in range(_MAX_RETRIES):
+        try:
+            return await fn(*args, **kwargs)
+        except (coc.errors.Forbidden, coc.errors.HTTPException, coc.errors.PrivateWarLog) as e:
+            err_str = str(e)
+            if not (_is_ip_error(e) and COC_EMAIL and COC_PASSWORD):
+                raise  # не IP-ошибка → пробрасываем как есть
+
             bad_ip = _extract_ip_from_error(err_str)
-            logger.warning(f"CoC IP ошибка (IP={bad_ip}) — обновляю ключ с новым CIDR диапазоном...")
+            logger.warning(
+                f"CoC IP ошибка попытка {attempt+1}/{_MAX_RETRIES} "
+                f"(IP={bad_ip}) — обновляю ключ..."
+            )
+            last_exc = e
             try:
                 ok = await _rekey_coc(new_ip=bad_ip)
-                if ok:
-                    logger.info("Ключ обновлён, повторяю запрос...")
-                    return await fn(*args, **kwargs)
-                else:
-                    logger.error("Не удалось обновить ключ")
-            except Exception as re_err:
-                logger.error(f"_rekey_coc не удался: {re_err}", exc_info=True)
-        raise
+                if not ok:
+                    logger.error("Не удалось пересоздать ключ")
+                    raise
+            except Exception as rekey_err:
+                if rekey_err is e:
+                    raise
+                logger.error(f"_rekey_coc не удался: {rekey_err}", exc_info=True)
+                raise e from None
+
+    # исчерпали попытки
+    if last_exc:
+        raise last_exc
 
 
 # Active auto-update tasks: chat_id -> asyncio.Task
