@@ -1898,7 +1898,7 @@ async def post_init(application):
         real_ip = await _detect_real_outbound_ip()
         if real_ip:
             logger.info(f"Реальный исходящий IP сервера: {real_ip}")
-            _known_server_ips.add(real_ip)
+            # _rekey_coc ниже вызовет _register_ip(real_ip) сам — дублировать не нужно
         else:
             logger.warning("Не удалось определить исходящий IP")
 
@@ -1945,7 +1945,11 @@ async def post_init(application):
 
 
 async def post_shutdown(application):
-    await coc_client.close()
+    try:
+        if coc_client.http is not None:
+            await coc_client.close()
+    except Exception:
+        pass
 
 
 async def conflict_error_handler(update, context):

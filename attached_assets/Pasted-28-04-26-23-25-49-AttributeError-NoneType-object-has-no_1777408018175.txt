@@ -1,0 +1,143 @@
+28/04/26 23:25:49
+AttributeError: 'NoneType' object has no attribute 'close'
+
+28/04/26 23:25:49
+          ^^^^^^^^^^^^^^^
+
+28/04/26 23:25:49
+    await self.http.close()
+
+28/04/26 23:25:49
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 464, in close
+
+28/04/26 23:25:49
+    await coc_client.close()
+
+28/04/26 23:25:49
+  File "/app/main.py", line 1948, in post_shutdown
+
+28/04/26 23:25:49
+           ^^^^^^^^^^^^^^^
+
+28/04/26 23:25:49
+    return future.result()
+
+28/04/26 23:25:49
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+
+28/04/26 23:25:49
+    loop.run_until_complete(self.post_shutdown(self))
+
+28/04/26 23:25:49
+  File "/app/venv/lib/python3.11/site-packages/telegram/ext/_application.py", line 1081, in __run
+
+28/04/26 23:25:49
+           ^^^^^^^^^^^
+
+28/04/26 23:25:49
+    return self.__run(
+
+28/04/26 23:25:49
+  File "/app/venv/lib/python3.11/site-packages/telegram/ext/_application.py", line 839, in run_polling
+
+28/04/26 23:25:49
+    app.run_polling()
+
+28/04/26 23:25:49
+  File "/app/main.py", line 2016, in main
+
+28/04/26 23:25:49
+    main()
+
+28/04/26 23:25:49
+  File "/app/main.py", line 2020, in <module>
+
+28/04/26 23:25:49
+Traceback (most recent call last):
+
+28/04/26 23:25:49
+During handling of the above exception, another exception occurred:
+
+28/04/26 23:25:49
+AttributeError: 'dict' object has no attribute 'add'
+
+28/04/26 23:25:49
+    ^^^^^^^^^^^^^^^^^^^^^
+
+28/04/26 23:25:49
+    _known_server_ips.add(real_ip)
+
+28/04/26 23:25:49
+  File "/app/main.py", line 1901, in post_init
+
+28/04/26 23:25:49
+           ^^^^^^^^^^^^^^^
+
+28/04/26 23:25:49
+    return future.result()
+
+28/04/26 23:25:49
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+
+28/04/26 23:25:49
+    loop.run_until_complete(self.post_init(self))
+
+28/04/26 23:25:49
+  File "/app/venv/lib/python3.11/site-packages/telegram/ext/_application.py", line 1056, in __run
+
+28/04/26 23:25:49
+Traceback (most recent call last):
+
+28/04/26 23:25:49
+2026-04-28 20:25:49,616 - __main__ - INFO - Реальный исходящий IP сервера: 51.250.124.21
+
+28/04/26 23:25:44
+2026-04-28 20:25:44,286 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getMe "HTTP/1.1 200 OK"
+
+28/04/26 23:25:44
+2026-04-28 20:25:44,119 - __main__ - INFO - Бот запущен...
+
+28/04/26 23:25:43
+2026-04-28 20:25:43,940 - __main__ - INFO - Health check server listening on port 8080
+
+28/04/26 23:25:13
+AttributeError: 'NoneType' object has no attribute 'close'
+
+28/04/26 23:25:13
+          ^^^^^^^^^^^^^^^
+
+28/04/26 23:25:13
+    await self.http.close()
+
+28/04/26 23:25:13
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 464, in close
+
+28/04/26 23:25:13
+    await coc_client.close()
+
+28/04/26 23:25:13
+  File "/app/main.py", line 1948, in post_shutdown
+
+28/04/26 23:25:13
+           ^^^^^^^^^^^^^^^
+
+28/04/26 23:25:13
+    return future.result()
+
+28/04/26 23:25:13
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+
+28/04/26 23:25:13
+    loop.run_until_complete(self.post_shutdown(self))
+
+28/04/26 23:25:13
+  File "/app/venv/lib/python3.11/site-packages/telegram/ext/_application.py", line 1081, in __run
+
+28/04/26 23:25:13
+           ^^^^^^^^^^^
+
+28/04/26 23:25:13
+    return self.__run(
+
+28/04/26 23:25:13
+  File "/app/venv/lib/python3.11/site-packages/telegram/ext/_application.py", line 839, in run_polling
