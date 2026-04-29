@@ -1,0 +1,149 @@
+29/04/26 12:51:02
+2026-04-29 09:51:02,808 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:51:02
+2026-04-29 09:51:02,627 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:51:02
+2026-04-29 09:51:02,626 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:51:01
+2026-04-29 09:51:01,922 - __main__ - WARNING - war_state_monitor: Error Occurred: None
+
+29/04/26 12:51:01
+2026-04-29 09:51:01,139 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:51:00
+2026-04-29 09:51:00,494 - __main__ - WARNING - cwl_state_monitor: Error Occurred: None
+
+29/04/26 12:50:51
+2026-04-29 09:50:51,159 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:51
+2026-04-29 09:50:51,087 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:51
+2026-04-29 09:50:51,086 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:49
+2026-04-29 09:50:49,736 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:49
+2026-04-29 09:50:49,656 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:49
+2026-04-29 09:50:49,654 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:48
+2026-04-29 09:50:48,359 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:48
+2026-04-29 09:50:48,285 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:48
+2026-04-29 09:50:48,283 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:46
+2026-04-29 09:50:46,943 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:46
+2026-04-29 09:50:46,861 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:46
+2026-04-29 09:50:46,859 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:45
+2026-04-29 09:50:45,425 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:45
+2026-04-29 09:50:45,345 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:45
+2026-04-29 09:50:45,342 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:43
+2026-04-29 09:50:43,957 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:43
+2026-04-29 09:50:43,883 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:43
+2026-04-29 09:50:43,882 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:42
+2026-04-29 09:50:42,058 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:41
+2026-04-29 09:50:41,832 - __main__ - INFO - Saved war notify chat_id: 673352370
+
+29/04/26 12:50:41
+2026-04-29 09:50:41,829 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:34
+2026-04-29 09:50:34,712 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:24
+2026-04-29 09:50:24,831 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/editMessageText "HTTP/1.1 200 OK"
+
+29/04/26 12:50:24
+coc.errors.Forbidden: accessDenied (status code: 403): Invalid authorization
+
+29/04/26 12:50:24
+    raise Forbidden(403, data)
+
+29/04/26 12:50:24
+  File "/app/venv/lib/python3.11/site-packages/coc/http.py", line 314, in request
+
+29/04/26 12:50:24
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+29/04/26 12:50:24
+    data = await self.http.get_clan(tag,
+
+29/04/26 12:50:24
+  File "/app/venv/lib/python3.11/site-packages/coc/client.py", line 610, in get_clan
+
+29/04/26 12:50:24
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+29/04/26 12:50:24
+    return await fn(*args, **kwargs)
+
+29/04/26 12:50:24
+  File "/app/main.py", line 278, in _coc_safe
+
+29/04/26 12:50:24
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+29/04/26 12:50:24
+    clan = await _coc_safe(coc_client.get_clan, CLAN_TAG)
+
+29/04/26 12:50:24
+  File "/app/main.py", line 545, in team_command
+
+29/04/26 12:50:24
+Traceback (most recent call last):
+
+29/04/26 12:50:24
+2026-04-29 09:50:24,735 - __main__ - ERROR - Ошибка при получении данных клана: accessDenied (status code: 403): Invalid authorization
+
+29/04/26 12:50:24
+2026-04-29 09:50:24,734 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:24
+2026-04-29 09:50:24,659 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:21
+2026-04-29 09:50:21,062 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/editMessageText "HTTP/1.1 200 OK"
+
+29/04/26 12:50:20
+2026-04-29 09:50:20,971 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:50:20
+2026-04-29 09:50:20,862 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:50:19
+2026-04-29 09:50:19,873 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/editMessageText "HTTP/1.1 200 OK"
+
+29/04/26 12:50:19
+coc.errors.Forbidden: accessDenied (status code: 403): Invalid authorization

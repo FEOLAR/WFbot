@@ -145,29 +145,13 @@ def _register_ip(ip: str):
     _save_known_ips()
 
 
-def _ip_to_cidr24(ip: str) -> str:
-    """Преобразует IP в /24 подсеть: 178.154.236.60 → 178.154.236.0/24."""
-    parts = ip.split(".")
-    if len(parts) == 4:
-        return f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
-    return ip  # не должно случиться
-
-
 def _get_key_ips() -> list[str]:
-    """Возвращает уникальные /24 CIDR подсети (до 10) из известных IP.
+    """Возвращает до 10 самых СВЕЖИХ индивидуальных IP для API-ключа.
 
-    Одна запись 178.154.236.0/24 покрывает все 256 адресов этой подсети,
-    поэтому ротация IP внутри одной подсети Yandex Cloud больше не нужна.
-    Подсети сортируются по свежести последнего замеченного IP из каждой.
+    CoC API проверяет точное совпадение IP, CIDR нотация не поддерживается.
+    Сортировка по timestamp последнего появления — самые свежие в начале.
     """
-    # Для каждой /24 подсети берём timestamp последнего замеченного IP
-    subnet_ts: dict[str, float] = {}
-    for ip, ts in _known_server_ips.items():
-        cidr = _ip_to_cidr24(ip)
-        if cidr not in subnet_ts or ts > subnet_ts[cidr]:
-            subnet_ts[cidr] = ts
-    # Возвращаем 10 самых свежих подсетей
-    by_recency = sorted(subnet_ts, key=lambda c: subnet_ts[c], reverse=True)
+    by_recency = sorted(_known_server_ips, key=lambda ip: _known_server_ips[ip], reverse=True)
     return by_recency[:10]
 
 
