@@ -1,0 +1,148 @@
+2026-04-29 09:41:50,495 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['178.154.236.60', '178.154.236.150', '178.154.236.138', '178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45']
+
+29/04/26 12:41:50
+2026-04-29 09:41:50,494 - __main__ - WARNING - CoC IP ошибка попытка 2/4 (IP=178.154.236.60) — обновляю ключ...
+
+29/04/26 12:41:50
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.60', 'status_code': 403, 'timestamp': 1777455710.494281, '_response_retry': 600}
+
+29/04/26 12:41:50
+<CIMultiDictProxy('Date': 'Wed, 29 Apr 2026 09:41:50 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+29/04/26 12:41:50
+2026-04-29 09:41:50,494 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+29/04/26 12:41:50
+2026-04-29 09:41:50,094 - __main__ - INFO - coc_client инициализирован через новый токен
+
+29/04/26 12:41:50
+2026-04-29 09:41:50,057 - __main__ - INFO - Новый ключ создан ✓ cidr=['178.154.236.150', '178.154.236.138', '178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47']
+
+29/04/26 12:41:49
+2026-04-29 09:41:49,859 - __main__ - INFO - Удалён ключ 'warfil_bot' id=92b5b5bb-1cda-4f07-bc7d-8f8a6512653b cidr=['178.154.236.138', '178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33']
+
+29/04/26 12:41:48
+2026-04-29 09:41:48,731 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['178.154.236.150', '178.154.236.138', '178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47']
+
+29/04/26 12:41:48
+2026-04-29 09:41:48,730 - __main__ - WARNING - CoC IP ошибка попытка 1/4 (IP=178.154.236.150) — обновляю ключ...
+
+29/04/26 12:41:48
+2026-04-29 09:41:48,728 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:41:48
+2026-04-29 09:41:48,518 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:41:39
+2026-04-29 09:41:39,123 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:41:29
+2026-04-29 09:41:29,072 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/getUpdates "HTTP/1.1 200 OK"
+
+29/04/26 12:41:25
+2026-04-29 09:41:25,556 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8690157836:AAFXrVdynsp_fueHyln2-29T2qtoNNaw1Xw/sendMessage "HTTP/1.1 200 OK"
+
+29/04/26 12:41:25
+2026-04-29 09:41:25,385 - __main__ - ERROR - CoC IP ошибка: исчерпаны все 4 пересоздания ключа (последний IP=178.154.236.150)
+
+29/04/26 12:41:25
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.150', 'status_code': 403, 'timestamp': 1777455685.384756, '_response_retry': 600}
+
+29/04/26 12:41:25
+<CIMultiDictProxy('Date': 'Wed, 29 Apr 2026 09:41:25 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+29/04/26 12:41:25
+2026-04-29 09:41:25,384 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,996 - __main__ - INFO - coc_client инициализирован через новый токен
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,956 - __main__ - INFO - Новый ключ создан ✓ cidr=['178.154.236.138', '178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33']
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,483 - __main__ - WARNING - cwl_state_monitor: accessDenied.invalidIp (status code: 403)
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,483 - __main__ - ERROR - Не удалось пересоздать ключ — прекращаю попытки
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,482 - __main__ - ERROR - Создание ключа не удалось: 403 — {"error":"general","description":"Temporary application error, request failed."}
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,332 - __main__ - INFO - Удалён ключ 'warfil_bot' id=134573dc-eaaa-4202-95c5-86471b703db8 cidr=['178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0']
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,174 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['178.154.236.138', '178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33']
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,173 - __main__ - WARNING - CoC IP ошибка попытка 4/4 (IP=178.154.236.138) — обновляю ключ...
+
+29/04/26 12:41:24
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.138', 'status_code': 403, 'timestamp': 1777455684.173507, '_response_retry': 600}
+
+29/04/26 12:41:24
+<CIMultiDictProxy('Date': 'Wed, 29 Apr 2026 09:41:24 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+29/04/26 12:41:24
+2026-04-29 09:41:24,173 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+29/04/26 12:41:23
+2026-04-29 09:41:23,778 - __main__ - INFO - coc_client инициализирован через новый токен
+
+29/04/26 12:41:23
+2026-04-29 09:41:23,647 - __main__ - INFO - Новый ключ создан ✓ cidr=['178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0']
+
+29/04/26 12:41:23
+2026-04-29 09:41:23,500 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0']
+
+29/04/26 12:41:23
+2026-04-29 09:41:23,500 - __main__ - WARNING - CoC IP ошибка попытка 1/4 (IP=None) — обновляю ключ...
+
+29/04/26 12:41:23
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.81', 'status_code': 403, 'timestamp': 1777455683.500253, '_response_retry': 600}
+
+29/04/26 12:41:23
+<CIMultiDictProxy('Date': 'Wed, 29 Apr 2026 09:41:23 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+29/04/26 12:41:23
+2026-04-29 09:41:23,500 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ/currentwar/leaguegroup) [403 Forbidden]>
+
+29/04/26 12:41:23
+2026-04-29 09:41:23,437 - __main__ - INFO - Удалён ключ 'warfil_bot' id=767e0382-6f1a-4295-bd22-57dac3ba1c27 cidr=['178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0', '178.154.236.40']
+
+29/04/26 12:41:22
+2026-04-29 09:41:22,794 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['178.154.236.81', '178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0']
+
+29/04/26 12:41:22
+2026-04-29 09:41:22,793 - __main__ - WARNING - CoC IP ошибка попытка 3/4 (IP=178.154.236.81) — обновляю ключ...
+
+29/04/26 12:41:22
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.81', 'status_code': 403, 'timestamp': 1777455682.792793, '_response_retry': 600}
+
+29/04/26 12:41:22
+<CIMultiDictProxy('Date': 'Wed, 29 Apr 2026 09:41:22 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>
+
+29/04/26 12:41:22
+2026-04-29 09:41:22,792 - coc.http - INFO - forbidden! resp: <ClientResponse(https://api.clashofclans.com/v1/clans/%232R02GGRUJ) [403 Forbidden]>
+
+29/04/26 12:41:22
+2026-04-29 09:41:22,416 - __main__ - INFO - coc_client инициализирован через новый токен
+
+29/04/26 12:41:22
+2026-04-29 09:41:22,385 - __main__ - INFO - Новый ключ создан ✓ cidr=['178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0', '178.154.236.40']
+
+29/04/26 12:41:22
+2026-04-29 09:41:22,190 - __main__ - INFO - Удалён ключ 'warfil_bot' id=d9063270-9087-4e2a-8918-08e4af72099b cidr=['84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0', '178.154.236.40', '178.154.236.72']
+
+29/04/26 12:41:21
+2026-04-29 09:41:21,505 - __main__ - INFO - Пересоздаю CoC ключ с cidrRanges=['178.154.236.98', '84.201.183.5', '178.154.236.121', '178.154.236.31', '178.154.236.152', '51.250.124.45', '178.154.236.47', '51.250.124.33', '51.250.53.0', '178.154.236.40']
+
+29/04/26 12:41:21
+2026-04-29 09:41:21,504 - __main__ - WARNING - CoC IP ошибка попытка 2/4 (IP=178.154.236.98) — обновляю ключ...
+
+29/04/26 12:41:21
+, msg: {'reason': 'accessDenied.invalidIp', 'message': 'Invalid authorization: API key does not allow access from IP 178.154.236.98', 'status_code': 403, 'timestamp': 1777455681.504488, '_response_retry': 600}
+
+29/04/26 12:41:21
+<CIMultiDictProxy('Date': 'Wed, 29 Apr 2026 09:41:21 GMT', 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'X-Content-Type-Options': 'nosniff', 'Strict-Transport-Security': 'max-age=43200', 'Cache-Control': 'public max-age=600', 'Content-Encoding': 'gzip')>

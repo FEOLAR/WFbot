@@ -145,9 +145,29 @@ def _register_ip(ip: str):
     _save_known_ips()
 
 
+def _ip_to_cidr24(ip: str) -> str:
+    """Преобразует IP в /24 подсеть: 178.154.236.60 → 178.154.236.0/24."""
+    parts = ip.split(".")
+    if len(parts) == 4:
+        return f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
+    return ip  # не должно случиться
+
+
 def _get_key_ips() -> list[str]:
-    """Возвращает до 10 самых СВЕЖИХ IP для API-ключа (сортировка по времени, не по алфавиту)."""
-    by_recency = sorted(_known_server_ips, key=lambda ip: _known_server_ips[ip], reverse=True)
+    """Возвращает уникальные /24 CIDR подсети (до 10) из известных IP.
+
+    Одна запись 178.154.236.0/24 покрывает все 256 адресов этой подсети,
+    поэтому ротация IP внутри одной подсети Yandex Cloud больше не нужна.
+    Подсети сортируются по свежести последнего замеченного IP из каждой.
+    """
+    # Для каждой /24 подсети берём timestamp последнего замеченного IP
+    subnet_ts: dict[str, float] = {}
+    for ip, ts in _known_server_ips.items():
+        cidr = _ip_to_cidr24(ip)
+        if cidr not in subnet_ts or ts > subnet_ts[cidr]:
+            subnet_ts[cidr] = ts
+    # Возвращаем 10 самых свежих подсетей
+    by_recency = sorted(subnet_ts, key=lambda c: subnet_ts[c], reverse=True)
     return by_recency[:10]
 
 
@@ -229,20 +249,31 @@ def _is_ip_error(e: Exception) -> bool:
     return "invalidIp" in str(e) or "accessDenied.invalidIp" in str(e)
 
 
-async def _coc_safe(fn, *args, **kwargs):
-    """Call a coc API function; on IP-Forbidden error update key CIDR and retry.
+# Замок чтобы только одна корутина пересоздавала ключ в один момент времени
+_rekey_lock: asyncio.Lock | None = None
 
-    Логика:
-    - Каждая неудача регистрирует новый IP и пересоздаёт ключ (теперь с 10 СВЕЖИХ IP).
-    - После исчерпания попыток пересоздания делается финальный запрос:
-      к тому моменту ключ содержит все недавно встреченные IP.
-    - Также перехватывает coc.PrivateWarLog когда coc.py неверно оборачивает
-      403/invalidIp (это происходит для get_league_group).
+
+def _get_rekey_lock() -> asyncio.Lock:
+    global _rekey_lock
+    if _rekey_lock is None:
+        _rekey_lock = asyncio.Lock()
+    return _rekey_lock
+
+
+async def _coc_safe(fn, *args, **kwargs):
+    """Call a coc API function; on IP-Forbidden retry indefinitely until success.
+
+    Каждый провал регистрирует новый IP, пересоздаёт ключ (используя /24 CIDR —
+    одна запись покрывает всю подсеть Yandex Cloud), и повторяет запрос.
+    Глобальный замок гарантирует что несколько параллельных команд не перетирают
+    ключ одновременно — все ждут пока один пересоздаст.
+    Также перехватывает coc.PrivateWarLog когда coc.py неверно оборачивает
+    403/invalidIp (это происходит для get_league_group).
     """
-    _MAX_REKEYS = 4   # сколько раз пересоздаём ключ до финальной попытки
+    attempt = 0
     last_exc: Exception | None = None
 
-    for attempt in range(_MAX_REKEYS + 1):  # +1 = финальная попытка после всех rekey
+    while True:
         try:
             return await fn(*args, **kwargs)
         except (coc.errors.Forbidden, coc.errors.HTTPException, coc.errors.PrivateWarLog) as e:
@@ -250,30 +281,37 @@ async def _coc_safe(fn, *args, **kwargs):
                 raise  # не IP-ошибка → пробрасываем как есть
 
             bad_ip = _extract_ip_from_error(str(e))
+            attempt += 1
             last_exc = e
 
-            if attempt >= _MAX_REKEYS:
-                # финальная попытка тоже провалилась — сдаёмся
-                logger.error(f"CoC IP ошибка: исчерпаны все {_MAX_REKEYS} пересоздания ключа (последний IP={bad_ip})")
+            logger.warning(f"CoC IP ошибка попытка {attempt} (IP={bad_ip}) — обновляю ключ...")
+
+            # Только одна корутина пересоздаёт ключ, остальные ждут
+            async with _get_rekey_lock():
+                # Пока ждали замок — возможно другая корутина уже пересоздала ключ.
+                # Сначала регистрируем IP, потом пробуем пересоздать.
                 if bad_ip:
-                    _register_ip(bad_ip)  # всё равно запоминаем для следующих запросов
-                break
+                    _register_ip(bad_ip)
 
-            logger.warning(
-                f"CoC IP ошибка попытка {attempt+1}/{_MAX_REKEYS} "
-                f"(IP={bad_ip}) — обновляю ключ..."
-            )
-            try:
-                ok = await _rekey_coc(new_ip=bad_ip)   # регистрирует IP + пересоздаёт ключ
-                if not ok:
-                    logger.error("Не удалось пересоздать ключ — прекращаю попытки")
-                    break
-            except Exception as rekey_err:
-                logger.error(f"_rekey_coc не удался: {rekey_err}", exc_info=True)
-                break
+                rekey_ok = False
+                for rekey_attempt in range(3):  # до 3 попыток пересоздания (portal может временно глючить)
+                    try:
+                        rekey_ok = await _rekey_coc()
+                        if rekey_ok:
+                            break
+                        logger.warning(f"Пересоздание ключа не удалось (попытка {rekey_attempt+1}/3), жду 3с...")
+                        await asyncio.sleep(3)
+                    except Exception as rekey_err:
+                        logger.error(f"_rekey_coc ошибка: {rekey_err}", exc_info=True)
+                        await asyncio.sleep(3)
 
-    if last_exc:
-        raise last_exc
+                if not rekey_ok:
+                    logger.error("Все попытки пересоздать ключ провалились — жду 10с перед следующим запросом")
+                    await asyncio.sleep(10)
+                    continue
+
+            # Небольшая пауза чтобы новый токен "осел" в CoC
+            await asyncio.sleep(1)
 
 
 # Active auto-update tasks: chat_id -> asyncio.Task
